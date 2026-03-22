@@ -23,7 +23,7 @@ def main(
     email: list[str] = typer.Option([], "--email", "-e", help="Known email addresses"),
     photo: str = typer.Option(None, "--photo", "-p", help="Path to photo for image search"),
     nicknames: list[str] = typer.Option([], "--nick", "-n", help="Nicknames"),
-    scanners: str = typer.Option("social,web", "--scanners", "-s", help="Comma-separated scanners"),
+    scanners: str = typer.Option("social,web,image", "--scanners", "-s", help="Comma-separated scanners"),
     output_format: str = typer.Option("markdown", "--format", "-f", help="Output format: markdown, pdf, json"),
 ):
     """Search for a person and generate an intelligence dossier."""
