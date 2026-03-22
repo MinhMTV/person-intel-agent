@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
-from app.models import PersonQuery, Location, PersonDossier, SearchResult, SocialProfile, ImageMatch
+from app.models import PersonQuery, Location, PersonDossier, SearchResult, SocialProfile, ImageMatch, Source, Confidence
 from app.scanners.social import SocialScanner
 from app.scanners.web import WebScanner
 from app.scanners.image import ImageScanner
