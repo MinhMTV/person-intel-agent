@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Person Intel Agent</title>
+    <meta name="description" content="Automated OSINT Dossier Generator">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="icon" href="/static/icon-192.svg" type="image/svg+xml">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .htmx-request .spinner { display: inline-block; }
+        .htmx-request .btn-text { display: none; }
+        @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.4} }
+        .pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+        .drop-zone.drag-over { border-color: #3b82f6; background-color: rgba(59,130,246,.1); }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+    <!-- Header -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <h1 class="text-xl font-bold tracking-tight">Person Intel Agent</h1>
+            </div>
+            <div class="flex items-center gap-3">
+                <button id="installBtn" class="hidden text-sm px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg transition">
+                    Install App
+                </button>
+                <span class="text-xs text-slate-500">v0.2.0</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 py-8">
+        <!-- Search Form -->
+        <section class="mb-8">
+            <h2 class="text-lg font-semibold mb-4 text-slate-300">New Search</h2>
+            <form id="searchForm"
+                  hx-post="/api/search"
+                  hx-encoding="multipart/form-data"
+                  hx-target="#results-section"
+                  hx-swap="innerHTML"
+                  hx-indicator="#search-spinner"
+                  class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5">
+
+                <!-- Name (required) -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Full Name <span class="text-red-400">*</span></label>
+                    <input type="text" name="name" required
+                        placeholder="e.g. John Smith"
+                        class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100
+                               placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+
+                <!-- Locations (multi-input) -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Locations</label>
+                    <div id="locations-container" class="flex flex-wrap gap-2 mb-2"></div>
+                    <div class="flex gap-2">
+                        <input type="text" id="location-input" placeholder="e.g. Berlin, NRW"
+                            class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100
+                                   placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button type="button" onclick="addTag('locations')" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">+ Add</button>
+                    </div>
+                    <input type="hidden" name="locations" id="locations-hidden">
+                </div>
+
+                <!-- Usernames (multi-input) -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Usernames</label>
+                    <div id="usernames-container" class="flex flex-wrap gap-2 mb-2"></div>
+                    <div class="flex gap-2">
+                        <input type="text" id="usernames-input" placeholder="e.g. jsmith, john_smith"
+                            class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100
+                                   placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button type="button" onclick="addTag('usernames')" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">+ Add</button>
+                    </div>
+                    <input type="hidden" name="usernames" id="usernames-hidden">
+                </div>
+
+                <!-- Nicknames (multi-input) -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Nicknames</label>
+                    <div id="nicknames-container" class="flex flex-wrap gap-2 mb-2"></div>
+                    <div class="flex gap-2">
+                        <input type="text" id="nicknames-input" placeholder="e.g. Johnny"
+                            class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100
+                                   placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button type="button" onclick="addTag('nicknames')" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">+ Add</button>
+                    </div>
+                    <input type="hidden" name="nicknames" id="nicknames-hidden">
+                </div>
+
+                <!-- Email -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Known Emails</label>
+                    <input type="text" name="email" placeholder="e.g. john@example.com"
+                        class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100
+                               placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <!-- Photo Upload (drag & drop) -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Reference Photo</label>
+                    <div id="dropZone" class="drop-zone border-2 border-dashed border-slate-700 rounded-xl p-8 text-center cursor-pointer
+                         hover:border-blue-500 transition-colors">
+                        <svg class="w-10 h-10 mx-auto mb-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                        <p class="text-slate-400 text-sm">Drag & drop a photo here, or <span class="text-blue-400">click to browse</span></p>
+                        <p class="text-slate-600 text-xs mt-1">Used for face recognition & reverse image search</p>
+                        <input type="file" name="photo" id="photoInput" accept="image/*" class="hidden">
+                    </div>
+                    <div id="photoPreview" class="hidden mt-3 flex items-center gap-3">
+                        <img id="photoThumb" class="w-16 h-16 rounded-lg object-cover border border-slate-700">
+                        <span id="photoName" class="text-sm text-slate-400"></span>
+                        <button type="button" onclick="clearPhoto()" class="text-red-400 hover:text-red-300 text-sm">✕ Remove</button>
+                    </div>
+                </div>
+
+                <!-- Submit -->
+                <div class="flex items-center gap-4 pt-2">
+                    <button type="submit"
+                        class="px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-medium transition
+                               flex items-center gap-2 disabled:opacity-50">
+                        <span id="search-spinner" class="spinner hidden">
+                            <svg class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                            </svg>
+                        </span>
+                        <span class="btn-text">Run Search</span>
+                    </button>
+                    <span id="search-status" class="text-sm text-slate-500"></span>
+                </div>
+            </form>
+        </section>
+
+        <!-- Results Section -->
+        <section id="results-section" class="space-y-6">
+            <!-- Placeholder -->
+            <div class="text-center py-16 text-slate-600">
+                <svg class="w-16 h-16 mx-auto mb-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <p>Enter a name above and click <strong>Run Search</strong> to generate a dossier.</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 mt-16 py-6 text-center text-xs text-slate-600">
+        Person Intel Agent — OSINT Dossier Generator — For authorized research only.
+    </footer>
+
+    <script>
+    // =====================================================================
+    // Tag-based multi-input
+    // =====================================================================
+    const tagStore = { locations: [], usernames: [], nicknames: [] };
+
+    function addTag(field) {
+        const input = document.getElementById(field + '-input');
+        const val = input.value.trim();
+        if (!val) return;
+        tagStore[field].push(val);
+        input.value = '';
+        renderTags(field);
+    }
+
+    function removeTag(field, idx) {
+        tagStore[field].splice(idx, 1);
+        renderTags(field);
+    }
+
+    function renderTags(field) {
+        const container = document.getElementById(field + '-container');
+        const hidden = document.getElementById(field + '-hidden');
+        container.innerHTML = tagStore[field].map((t, i) =>
+            `<span class="inline-flex items-center gap-1 px-3 py-1 bg-slate-800 border border-slate-700 rounded-full text-sm">
+                ${escHtml(t)}
+                <button type="button" onclick="removeTag('${field}',${i})" class="text-slate-500 hover:text-red-400 ml-1">&times;</button>
+            </span>`
+        ).join('');
+        hidden.value = tagStore[field].join(',');
+    }
+
+    function escHtml(s) {
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    // Enter key on inputs
+    document.querySelectorAll('[id$="-input"]').forEach(el => {
+        el.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addTag(el.id.replace('-input', ''));
+            }
+        });
+    });
+
+    // =====================================================================
+    // Photo drag & drop
+    // =====================================================================
+    const dropZone = document.getElementById('dropZone');
+    const photoInput = document.getElementById('photoInput');
+
+    dropZone.addEventListener('click', () => photoInput.click());
+
+    dropZone.addEventListener('dragover', e => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        if (e.dataTransfer.files.length) {
+            photoInput.files = e.dataTransfer.files;
+            showPhotoPreview(e.dataTransfer.files[0]);
+        }
+    });
+    photoInput.addEventListener('change', () => {
+        if (photoInput.files.length) showPhotoPreview(photoInput.files[0]);
+    });
+
+    function showPhotoPreview(file) {
+        const reader = new FileReader();
+        reader.onload = e => {
+            document.getElementById('photoThumb').src = e.target.result;
+            document.getElementById('photoName').textContent = file.name;
+            document.getElementById('photoPreview').classList.remove('hidden');
+            dropZone.classList.add('hidden');
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function clearPhoto() {
+        photoInput.value = '';
+        document.getElementById('photoPreview').classList.add('hidden');
+        dropZone.classList.remove('hidden');
+    }
+
+    // =====================================================================
+    // HTMX response handling — render results
+    // =====================================================================
+    document.body.addEventListener('htmx:afterRequest', function(evt) {
+        if (evt.detail.pathInfo.requestPath === '/api/search' && evt.detail.successful) {
+            const data = JSON.parse(evt.detail.xhr.responseText);
+            renderResults(data);
+        }
+    });
+
+    function renderResults(data) {
+        const section = document.getElementById('results-section');
+        const d = data.dossier;
+
+        let tabsHtml = `
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+            <!-- Summary bar -->
+            <div class="px-6 py-4 border-b border-slate-800 flex flex-wrap items-center gap-4">
+                <h2 class="text-lg font-semibold flex-1">Dossier: ${escHtml(d.query.full_name)}</h2>
+                <div class="flex gap-3 text-sm">
+                    <span class="px-2 py-1 rounded bg-blue-900/50 text-blue-300">${data.results.social_profiles} Social</span>
+                    <span class="px-2 py-1 rounded bg-green-900/50 text-green-300">${data.results.web_results} Web</span>
+                    <span class="px-2 py-1 rounded bg-purple-900/50 text-purple-300">${data.results.image_matches} Images</span>
+                    <span class="px-2 py-1 rounded bg-amber-900/50 text-amber-300">${data.results.email_addresses} Emails</span>
+                </div>
+                <div class="flex gap-2">
+                    <a href="/api/dossier/${data.id}/download?fmt=json"
+                       class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">⬇ JSON</a>
+                    <a href="/api/dossier/${data.id}/download?fmt=markdown"
+                       class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">⬇ Markdown</a>
+                </div>
+            </div>
+
+            <!-- Tab buttons -->
+            <div class="flex border-b border-slate-800" id="tab-bar">
+                <button onclick="switchTab('social')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-blue-500 text-blue-400" data-tab="social">Social</button>
+                <button onclick="switchTab('web')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-300" data-tab="web">Web</button>
+                <button onclick="switchTab('images')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-300" data-tab="images">Images</button>
+                <button onclick="switchTab('professional')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-300" data-tab="professional">Professional</button>
+                <button onclick="switchTab('emails')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-300" data-tab="emails">Emails</button>
+            </div>
+
+            <!-- Tab content -->
+            <div class="p-6">
+                <div id="tab-social" class="tab-content">${renderSocialProfiles(d.social_profiles)}</div>
+                <div id="tab-web" class="tab-content hidden">${renderWebResults(d.web_results)}</div>
+                <div id="tab-images" class="tab-content hidden">${renderImageMatches(d.image_matches)}</div>
+                <div id="tab-professional" class="tab-content hidden">${renderProfessional(d.professional)}</div>
+                <div id="tab-emails" class="tab-content hidden">${renderEmails(d.email_addresses)}</div>
+            </div>
+        </div>`;
+
+        section.innerHTML = tabsHtml;
+    }
+
+    function switchTab(name) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.tab-btn').forEach(el => {
+            el.classList.remove('border-blue-500', 'text-blue-400');
+            el.classList.add('border-transparent', 'text-slate-500');
+        });
+        document.getElementById('tab-' + name).classList.remove('hidden');
+        const btn = document.querySelector(`.tab-btn[data-tab="${name}"]`);
+        btn.classList.add('border-blue-500', 'text-blue-400');
+        btn.classList.remove('border-transparent', 'text-slate-500');
+    }
+
+    // Render helpers
+    function renderSocialProfiles(profiles) {
+        if (!profiles || !profiles.length) return emptyState('No social profiles found.');
+        return `<div class="space-y-3">${profiles.map(p => `
+            <div class="flex items-center gap-4 p-3 bg-slate-800/50 rounded-xl">
+                <div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-sm font-bold uppercase">${escHtml(p.platform?.[0] || '?')}</div>
+                <div class="flex-1 min-w-0">
+                    <a href="${escHtml(p.url)}" target="_blank" rel="noopener" class="text-blue-400 hover:underline font-medium">${escHtml(p.display_name || p.username || p.platform)}</a>
+                    <div class="text-sm text-slate-500 truncate">${escHtml(p.bio || p.platform)}</div>
+                </div>
+                <span class="text-xs px-2 py-0.5 rounded-full ${confClass(p.confidence)}">${escHtml(p.confidence)}</span>
+            </div>`).join('')}</div>`;
+    }
+
+    function renderWebResults(results) {
+        if (!results || !results.length) return emptyState('No web results found.');
+        return `<div class="space-y-3">${results.slice(0, 20).map(r => `
+            <div class="p-3 bg-slate-800/50 rounded-xl">
+                <a href="${escHtml(r.url)}" target="_blank" rel="noopener" class="text-blue-400 hover:underline font-medium">${escHtml(r.title)}</a>
+                <div class="text-sm text-slate-500 truncate mt-1">${escHtml(r.snippet || r.url)}</div>
+                <div class="text-xs text-slate-600 mt-1">${escHtml(r.source)} · ${escHtml(r.confidence)}</div>
+            </div>`).join('')}</div>`;
+    }
+
+    function renderImageMatches(matches) {
+        if (!matches || !matches.length) return emptyState('No image matches found.');
+        return `<div class="space-y-3">${matches.map(m => `
+            <div class="flex items-center gap-4 p-3 bg-slate-800/50 rounded-xl">
+                <img src="${escHtml(m.image_url)}" class="w-16 h-16 rounded-lg object-cover border border-slate-700" onerror="this.style.display='none'">
+                <div class="flex-1 min-w-0">
+                    <a href="${escHtml(m.source_url)}" target="_blank" rel="noopener" class="text-blue-400 hover:underline text-sm">${escHtml(m.source_url).substring(0, 60)}…</a>
+                    <div class="text-sm text-slate-500">${escHtml(m.context || '')}</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-lg font-bold ${m.similarity_score > 0.8 ? 'text-green-400' : m.similarity_score > 0.6 ? 'text-amber-400' : 'text-slate-400'}">${(m.similarity_score * 100).toFixed(0)}%</div>
+                    <div class="text-xs text-slate-600">similarity</div>
+                </div>
+            </div>`).join('')}</div>`;
+    }
+
+    function renderProfessional(results) {
+        if (!results || !results.length) return emptyState('No professional results found.');
+        return `<div class="space-y-3">${results.map(r => `
+            <div class="p-3 bg-slate-800/50 rounded-xl">
+                <a href="${escHtml(r.url)}" target="_blank" rel="noopener" class="text-blue-400 hover:underline font-medium">${escHtml(r.title)}</a>
+                <div class="text-sm text-slate-500 mt-1">${escHtml(r.snippet || r.url)}</div>
+            </div>`).join('')}</div>`;
+    }
+
+    function renderEmails(emails) {
+        if (!emails || !emails.length) return emptyState('No email addresses found.');
+        return `<div class="space-y-2">${emails.map(e => `
+            <div class="flex items-center gap-3 p-3 bg-slate-800/50 rounded-xl">
+                <svg class="w-5 h-5 text-slate-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                </svg>
+                <span class="text-slate-300 font-mono text-sm">${escHtml(e)}</span>
+            </div>`).join('')}</div>`;
+    }
+
+    function confClass(c) {
+        if (c === 'high') return 'bg-green-900/50 text-green-300';
+        if (c === 'medium') return 'bg-amber-900/50 text-amber-300';
+        return 'bg-slate-700 text-slate-400';
+    }
+
+    function emptyState(msg) {
+        return `<div class="text-center py-8 text-slate-600"><p>${escHtml(msg)}</p></div>`;
+    }
+
+    // =====================================================================
+    // PWA install prompt
+    // =====================================================================
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', e => {
+        e.preventDefault();
+        deferredPrompt = e;
+        document.getElementById('installBtn').classList.remove('hidden');
+    });
+    document.getElementById('installBtn')?.addEventListener('click', async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        document.getElementById('installBtn').classList.add('hidden');
+    });
+
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+    }
+    </script>
+</body>
+</html>

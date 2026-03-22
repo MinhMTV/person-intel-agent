@@ -11,7 +11,9 @@ from app.models import PersonQuery, Location, PersonDossier, SearchResult, Socia
 from app.scanners.social import SocialScanner
 from app.scanners.web import WebScanner
 from app.scanners.image import ImageScanner
+from app.scanners.email import EmailScanner
 from app.scanners.professional import ProfessionalScanner, LinkedInScraper, XingScraper
+from app.scanners.advanced_image import AdvancedImageScanner
 
 console = Console()
 app = typer.Typer(help="Person Intelligence Agent — Automated OSINT Dossier Generator")
@@ -26,7 +28,7 @@ def search(
     email: list[str] = typer.Option([], "--email", "-e", help="Known email addresses"),
     photo: str = typer.Option(None, "--photo", "-p", help="Path to photo for image search"),
     nicknames: list[str] = typer.Option([], "--nick", "-n", help="Nicknames"),
-    scanners: str = typer.Option("social,web,image,professional", "--scanners", "-s", help="Comma-separated scanners"),
+    scanners: str = typer.Option("social,web,email,image,professional", "--scanners", "-s", help="Comma-separated scanners"),
     output_format: str = typer.Option("markdown", "--format", "-f", help="Output format: markdown, pdf, json"),
 ):
     """Search for a person and generate an intelligence dossier."""
@@ -78,12 +80,35 @@ def login(
     asyncio.run(_login())
 
 
+@app.command()
+def serve(
+    host: str = typer.Option("0.0.0.0", "--host", "-h", help="Bind host"),
+    port: int = typer.Option(8080, "--port", "-p", help="Bind port"),
+    reload: bool = typer.Option(False, "--reload", help="Enable auto-reload (dev mode)"),
+):
+    """Start the FastAPI web server."""
+    import uvicorn
+
+    console.print(f"\n🚀 Starting Person Intel Agent web server on [bold]{host}:{port}[/bold]")
+    console.print(f"   Dashboard: [link=http://{host}:{port}]http://{host}:{port}[/link]\n")
+
+    uvicorn.run(
+        "app.web:app",
+        host=host,
+        port=port,
+        reload=reload,
+        log_level="info",
+    )
+
+
 async def _run_scanners(query: PersonQuery, scanner_list: str) -> PersonDossier:
     """Run selected scanners."""
     scanner_map = {
         "social": SocialScanner(),
         "web": WebScanner(),
+        "email": EmailScanner(),
         "image": ImageScanner(),
+        "advanced_image": AdvancedImageScanner(),
         "professional": ProfessionalScanner(headless=True),
     }
 
@@ -110,7 +135,12 @@ async def _run_scanners(query: PersonQuery, scanner_list: str) -> PersonDossier:
                     elif isinstance(r, ImageMatch):
                         dossier.image_matches.append(r)
                     elif isinstance(r, SearchResult):
-                        dossier.web_results.append(r)
+                        if r.source in (Source.EMAIL, Source.BREACH):
+                            dossier.email_addresses.append(r.url.replace("mailto:", ""))
+                        elif r.source in (Source.LINKEDIN, Source.XING):
+                            dossier.professional.append(r)
+                        else:
+                            dossier.web_results.append(r)
             except Exception as e:
                 progress.update(task, description=f"❌ {scanner.name} — {e}")
 
