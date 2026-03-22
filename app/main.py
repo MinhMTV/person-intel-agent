@@ -11,11 +11,14 @@ from app.models import PersonQuery, Location, PersonDossier, SearchResult, Socia
 from app.scanners.social import SocialScanner
 from app.scanners.web import WebScanner
 from app.scanners.image import ImageScanner
+from app.scanners.professional import ProfessionalScanner
 
 console = Console()
+app = typer.Typer(help="Person Intelligence Agent — Automated OSINT Dossier Generator")
 
 
-def main(
+@app.command()
+def search(
     name: str = typer.Argument(..., help="Full name of the person to search"),
     location: list[str] = typer.Option([], "--location", "-l", help="Locations (e.g. 'Oberhausen', 'NRW')"),
     country: list[str] = typer.Option([], "--country", "-c", help="Country codes (e.g. DE, AT)"),
@@ -23,7 +26,7 @@ def main(
     email: list[str] = typer.Option([], "--email", "-e", help="Known email addresses"),
     photo: str = typer.Option(None, "--photo", "-p", help="Path to photo for image search"),
     nicknames: list[str] = typer.Option([], "--nick", "-n", help="Nicknames"),
-    scanners: str = typer.Option("social,web,image", "--scanners", "-s", help="Comma-separated scanners"),
+    scanners: str = typer.Option("social,web,image,professional", "--scanners", "-s", help="Comma-separated scanners"),
     output_format: str = typer.Option("markdown", "--format", "-f", help="Output format: markdown, pdf, json"),
 ):
     """Search for a person and generate an intelligence dossier."""
@@ -56,12 +59,32 @@ def main(
     _save_output(dossier, output_format)
 
 
+@app.command()
+def login(
+    platform: str = typer.Argument(..., help="Platform to log in: linkedin, xing, or both"),
+):
+    """Login to LinkedIn and/or Xing to enable authenticated scraping."""
+    async def _login():
+        if platform in ("linkedin", "both"):
+            scraper = LinkedInScraper(headless=False)
+            print("\n🔗 LinkedIn Login")
+            await scraper.login_and_save_cookies()
+
+        if platform in ("xing", "both"):
+            scraper = XingScraper(headless=False)
+            print("\n🔗 Xing Login")
+            await scraper.login_and_save_cookies()
+
+    asyncio.run(_login())
+
+
 async def _run_scanners(query: PersonQuery, scanner_list: str) -> PersonDossier:
-    """Run selected scanners concurrently."""
+    """Run selected scanners."""
     scanner_map = {
         "social": SocialScanner(),
         "web": WebScanner(),
         "image": ImageScanner(),
+        "professional": ProfessionalScanner(headless=True),
     }
 
     selected = [s.strip() for s in scanner_list.split(",")]
@@ -74,12 +97,8 @@ async def _run_scanners(query: PersonQuery, scanner_list: str) -> PersonDossier:
         TextColumn("[progress.description]{task.description}"),
         console=console,
     ) as progress:
-        tasks = []
         for scanner in scanners:
             task = progress.add_task(f"Running {scanner.name}...", total=None)
-            tasks.append((scanner, task))
-
-        for scanner, task in tasks:
             try:
                 results = await scanner.scan(query)
                 progress.update(task, description=f"✅ {scanner.name} — {len(results)} results")
@@ -111,7 +130,8 @@ def _display_results(dossier: PersonDossier):
 
     table.add_row("Social Profiles", str(len(dossier.social_profiles)), social_summary)
     table.add_row("Web Results", str(len(dossier.web_results)), web_summary)
-    table.add_row("Image Matches", str(len(dossier.image_matches)), "—" if not dossier.image_matches else f"Best: {dossier.image_matches[0].similarity_score:.0%}")
+    table.add_row("Image Matches", str(len(dossier.image_matches)),
+                   "—" if not dossier.image_matches else f"Best: {dossier.image_matches[0].similarity_score:.0%}")
     table.add_row("Emails", str(len(dossier.email_addresses)), "—")
     table.add_row("Scanners Used", ", ".join(dossier.scanners_used), "—")
 
@@ -121,7 +141,8 @@ def _display_results(dossier: PersonDossier):
     if dossier.social_profiles:
         console.print("\n[bold cyan]📱 Social Profiles Found:[/bold cyan]")
         for p in dossier.social_profiles:
-            console.print(f"  • [green]{p.platform}[/green]: {p.url}")
+            extra = f" — {p.bio[:40]}" if p.bio else ""
+            console.print(f"  • [green]{p.platform}[/green]: {p.url}{extra}")
 
     # Detailed web results
     if dossier.web_results:
@@ -159,4 +180,4 @@ def _save_output(dossier: PersonDossier, fmt: str):
 
 
 if __name__ == "__main__":
-    typer.run(main)
+    app()
