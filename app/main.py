@@ -7,9 +7,10 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
-from app.models import PersonQuery, Location, PersonDossier, SearchResult, SocialProfile
+from app.models import PersonQuery, Location, PersonDossier, SearchResult, SocialProfile, ImageMatch
 from app.scanners.social import SocialScanner
 from app.scanners.web import WebScanner
+from app.scanners.image import ImageScanner
 
 console = Console()
 
@@ -60,6 +61,7 @@ async def _run_scanners(query: PersonQuery, scanner_list: str) -> PersonDossier:
     scanner_map = {
         "social": SocialScanner(),
         "web": WebScanner(),
+        "image": ImageScanner(),
     }
 
     selected = [s.strip() for s in scanner_list.split(",")]
@@ -86,6 +88,8 @@ async def _run_scanners(query: PersonQuery, scanner_list: str) -> PersonDossier:
                 for r in results:
                     if isinstance(r, SocialProfile):
                         dossier.social_profiles.append(r)
+                    elif isinstance(r, ImageMatch):
+                        dossier.image_matches.append(r)
                     elif isinstance(r, SearchResult):
                         dossier.web_results.append(r)
             except Exception as e:
@@ -107,6 +111,7 @@ def _display_results(dossier: PersonDossier):
 
     table.add_row("Social Profiles", str(len(dossier.social_profiles)), social_summary)
     table.add_row("Web Results", str(len(dossier.web_results)), web_summary)
+    table.add_row("Image Matches", str(len(dossier.image_matches)), "—" if not dossier.image_matches else f"Best: {dossier.image_matches[0].similarity_score:.0%}")
     table.add_row("Emails", str(len(dossier.email_addresses)), "—")
     table.add_row("Scanners Used", ", ".join(dossier.scanners_used), "—")
 
@@ -124,6 +129,14 @@ def _display_results(dossier: PersonDossier):
         for r in dossier.web_results[:10]:
             console.print(f"  • {r.title[:60]}")
             console.print(f"    {r.url}")
+
+    # Detailed image matches
+    if dossier.image_matches:
+        console.print("\n[bold cyan]🖼️ Image Matches (Face Recognition):[/bold cyan]")
+        for m in dossier.image_matches:
+            console.print(f"  • Similarity: [green]{m.similarity_score:.0%}[/green]")
+            console.print(f"    Source: {m.source_url[:60]}")
+            console.print(f"    Image: {m.image_url[:60]}")
 
 
 def _save_output(dossier: PersonDossier, fmt: str):
