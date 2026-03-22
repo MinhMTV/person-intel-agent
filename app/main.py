@@ -11,7 +11,7 @@ from app.models import PersonQuery, Location, PersonDossier, SearchResult, Socia
 from app.scanners.social import SocialScanner
 from app.scanners.web import WebScanner
 from app.scanners.image import ImageScanner
-from app.scanners.professional import ProfessionalScanner
+from app.scanners.professional import ProfessionalScanner, LinkedInScraper, XingScraper
 
 console = Console()
 app = typer.Typer(help="Person Intelligence Agent — Automated OSINT Dossier Generator")
