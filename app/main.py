@@ -8,6 +8,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from app.models import PersonQuery, Location, PersonDossier, SearchResult, SocialProfile, ImageMatch, Source, Confidence
+from app.analysis.dedup import dedup_all
 from app.scanners.social import SocialScanner
 from app.scanners.web import WebScanner
 from app.scanners.image import ImageScanner
@@ -350,6 +351,23 @@ async def _run_scanners(query: PersonQuery, scanner_list: str) -> PersonDossier:
                 progress.update(task, description=f"❌ {scanner.name} — {e}")
 
     dossier.total_sources_checked = len(dossier.web_results) + len(dossier.social_profiles)
+
+    # Deduplicate results
+    deduped = dedup_all(
+        social=dossier.social_profiles,
+        web=dossier.web_results,
+        images=dossier.image_matches,
+        emails=dossier.email_addresses,
+        professional=dossier.professional,
+        academic=dossier.academic,
+    )
+    dossier.social_profiles = deduped["social_profiles"]
+    dossier.web_results = deduped["web_results"]
+    dossier.image_matches = deduped["image_matches"]
+    dossier.email_addresses = deduped["email_addresses"]
+    dossier.professional = deduped["professional"]
+    dossier.academic = deduped["academic"]
+
     return dossier
 
 
