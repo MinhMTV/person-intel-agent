@@ -923,6 +923,7 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                     <a href="/api/dossier/${data.id}/download?fmt=markdown" target="_blank" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Export MD">📥 MD</a>
                     <button onclick="pinSearch('${data.id}')" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Pin">📌 Pin</button>
                     <button onclick="addTag('${data.id}')" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Tag">🏷️ Tag</button>
+                    <button onclick="addNotes('${data.id}')" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Notes">📝 Notes</button>
                     ${d.confidence_score ? `<span class="px-2 py-1 rounded bg-slate-700 text-slate-300">Confidence: ${(d.confidence_score * 100).toFixed(0)}%</span>` : ''}
                 </div>
                 <div class="flex gap-2">
@@ -1331,6 +1332,22 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
             loadHistory();
         } catch (e) {
             showToast('Failed to pin search', 'error');
+        }
+    }
+
+    async function addNotes(id) {
+        const notes = prompt('Enter notes:');
+        if (notes === null) return;
+        try {
+            const resp = await fetch(`/api/history/notes/${id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notes })
+            });
+            showToast(notes ? 'Notes saved' : 'Notes cleared', 'success');
+            loadHistory();
+        } catch (e) {
+            showToast('Failed to save notes', 'error');
         }
     }
 
