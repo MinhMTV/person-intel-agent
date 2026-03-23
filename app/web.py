@@ -230,6 +230,34 @@ async def api_add_notes(dossier_id: str, body: dict = Body(...)):
     raise HTTPException(status_code=404, detail="Search not found")
 
 
+@app.post("/api/history/tags/{dossier_id}")
+async def api_add_tag(dossier_id: str, body: dict = Body(...)):
+    """Add/remove tags for a search."""
+    tag = body.get("tag", "").strip().lower()
+    if not tag:
+        raise HTTPException(status_code=400, detail="Tag required")
+    for entry in _search_history:
+        if entry.get("id") == dossier_id:
+            tags = set(entry.get("tags", []))
+            if tag in tags:
+                tags.discard(tag)
+            else:
+                tags.add(tag)
+            entry["tags"] = sorted(tags)
+            return {"id": dossier_id, "tags": entry["tags"]}
+    raise HTTPException(status_code=404, detail="Search not found")
+
+
+@app.get("/api/history/tags")
+async def api_all_tags():
+    """Get all unique tags with counts."""
+    tag_counts: dict[str, int] = {}
+    for entry in _search_history:
+        for t in entry.get("tags", []):
+            tag_counts[t] = tag_counts.get(t, 0) + 1
+    return {"tags": tag_counts}
+
+
 @app.get("/api/history/export")
 async def api_history_export(fmt: str = "json"):
     """Export search history as JSON or CSV."""
