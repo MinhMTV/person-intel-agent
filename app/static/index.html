@@ -164,7 +164,10 @@
         <section id="history-section" class="mt-8">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-lg font-semibold text-slate-300">Search History</h2>
-                <button onclick="loadHistory()" class="text-sm text-slate-500 hover:text-slate-300 transition">↻ Refresh</button>
+                <div class="flex gap-2">
+                    <button onclick="showCompareDialog()" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">⚖️ Compare</button>
+                    <button onclick="loadHistory()" class="text-sm text-slate-500 hover:text-slate-300 transition">↻ Refresh</button>
+                </div>
             </div>
             <div id="history-list" class="space-y-2">
                 <p class="text-sm text-slate-600">Loading...</p>
@@ -344,6 +347,138 @@
 
     // Load history on page load
     loadHistory();
+
+    // =====================================================================
+    // Compare View
+    // =====================================================================
+    let compareHistoryCache = [];
+
+    async function showCompareDialog() {
+        const resp = await fetch('/api/history?limit=20');
+        const data = await resp.json();
+        compareHistoryCache = data.history || [];
+
+        if (compareHistoryCache.length < 2) {
+            alert('Need at least 2 searches to compare.');
+            return;
+        }
+
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+        modal.innerHTML = `
+            <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-semibold">⚖️ Compare Two Dossiers</h3>
+                    <button onclick="this.closest('.fixed').remove()" class="text-slate-500 hover:text-white text-xl">&times;</button>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Dossier 1</label>
+                    <select id="compare-1" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-300">
+                        ${compareHistoryCache.map(h => `<option value="${h.id}">${escHtml(h.name)} (${formatTime(h.timestamp)})</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Dossier 2</label>
+                    <select id="compare-2" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-300">
+                        ${compareHistoryCache.map((h, i) => `<option value="${h.id}" ${i === 1 ? 'selected' : ''}>${escHtml(h.name)} (${formatTime(h.timestamp)})</option>`).join('')}
+                    </select>
+                </div>
+                <button onclick="runCompare()" class="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl font-medium transition">Compare</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    async function runCompare() {
+        const id1 = document.getElementById('compare-1').value;
+        const id2 = document.getElementById('compare-2').value;
+
+        if (id1 === id2) {
+            alert('Please select two different dossiers.');
+            return;
+        }
+
+        // Close dialog
+        document.querySelector('.fixed')?.remove();
+
+        try {
+            const resp = await fetch(`/api/v2/search/compare?id1=${id1}&id2=${id2}`);
+            const data = await resp.json();
+            renderCompareResults(data, id1, id2);
+        } catch (e) {
+            console.error('Compare error:', e);
+        }
+    }
+
+    function renderCompareResults(data, id1, id2) {
+        const section = document.getElementById('results-section');
+
+        section.innerHTML = `
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-800 flex items-center gap-4">
+                <h2 class="text-lg font-semibold flex-1">⚖️ Compare: ${escHtml(data.dossier_1.name)} vs ${escHtml(data.dossier_2.name)}</h2>
+                <button onclick="loadDossier('${id1}')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm">← Back to ${escHtml(data.dossier_1.name)}</button>
+            </div>
+
+            <div class="p-6 space-y-6">
+                <!-- Side by side overview -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-slate-800 rounded-xl p-4 text-center">
+                        <div class="text-2xl font-bold text-blue-400">${data.dossier_1.results}</div>
+                        <div class="text-sm text-slate-400">${escHtml(data.dossier_1.name)}</div>
+                    </div>
+                    <div class="bg-slate-800 rounded-xl p-4 text-center">
+                        <div class="text-2xl font-bold text-green-400">${data.dossier_2.results}</div>
+                        <div class="text-sm text-slate-400">${escHtml(data.dossier_2.name)}</div>
+                    </div>
+                </div>
+
+                <!-- Connection Score -->
+                <div class="bg-slate-800 rounded-xl p-4 text-center">
+                    <div class="text-3xl font-bold ${data.connection_score > 3 ? 'text-red-400' : data.connection_score > 0 ? 'text-amber-400' : 'text-slate-400'}">${data.connection_score}</div>
+                    <div class="text-sm text-slate-400">Connection Score</div>
+                    <div class="text-xs text-slate-500 mt-1">Shared platforms + emails (weighted)</div>
+                </div>
+
+                ${data.shared_platforms.length ? `
+                <div>
+                    <h3 class="text-sm font-medium text-slate-400 mb-2">🔗 Shared Platforms</h3>
+                    <div class="flex flex-wrap gap-2">
+                        ${data.shared_platforms.map(p => `<span class="px-3 py-1 rounded-full bg-red-900/30 text-red-300 border border-red-500/30">${escHtml(p)}</span>`).join('')}
+                    </div>
+                </div>` : ''}
+
+                ${data.shared_emails.length ? `
+                <div>
+                    <h3 class="text-sm font-medium text-slate-400 mb-2">📧 Shared Emails</h3>
+                    <div class="flex flex-wrap gap-2">
+                        ${data.shared_emails.map(e => `<span class="px-3 py-1 rounded-full bg-amber-900/30 text-amber-300 border border-amber-500/30 font-mono text-sm">${escHtml(e)}</span>`).join('')}
+                    </div>
+                </div>` : ''}
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <h3 class="text-sm font-medium text-slate-400 mb-2">Only ${escHtml(data.dossier_1.name)}</h3>
+                        <div class="space-y-1">
+                            ${data.unique_to_1.length ? data.unique_to_1.map(p =>
+                                `<span class="inline-block px-2 py-1 rounded bg-blue-900/30 text-blue-300 text-sm mr-1">${escHtml(p)}</span>`
+                            ).join('') : '<span class="text-slate-600 text-sm">None</span>'}
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-medium text-slate-400 mb-2">Only ${escHtml(data.dossier_2.name)}</h3>
+                        <div class="space-y-1">
+                            ${data.unique_to_2.length ? data.unique_to_2.map(p =>
+                                `<span class="inline-block px-2 py-1 rounded bg-green-900/30 text-green-300 text-sm mr-1">${escHtml(p)}</span>`
+                            ).join('') : '<span class="text-slate-600 text-sm">None</span>'}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    }
 
     function renderResults(data) {
         const section = document.getElementById('results-section');
