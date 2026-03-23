@@ -327,6 +327,39 @@ async def api_history_export(fmt: str = "json"):
         )
 
 
+@app.get("/api/dossiers/stats")
+async def api_dossier_stats():
+    """Get stats across all dossiers."""
+    if not _dossiers:
+        return {"total": 0, "stats": {}}
+    total = len(_dossiers)
+    total_social = sum(len(d.social_profiles) for d in _dossiers.values())
+    total_web = sum(len(d.web_results) for d in _dossiers.values())
+    total_images = sum(len(d.image_matches) for d in _dossiers.values())
+    total_emails = sum(len(d.email_addresses) for d in _dossiers.values())
+    total_professional = sum(len(d.professional) for d in _dossiers.values())
+    avg_confidence = sum(d.confidence_score for d in _dossiers.values()) / total
+    platforms = {}
+    for d in _dossiers.values():
+        for sp in d.social_profiles:
+            platforms[sp.platform] = platforms.get(sp.platform, 0) + 1
+    top_platforms = sorted(platforms.items(), key=lambda x: x[1], reverse=True)[:10]
+    return {
+        "total": total,
+        "stats": {
+            "total_social_profiles": total_social,
+            "total_web_results": total_web,
+            "total_image_matches": total_images,
+            "total_email_addresses": total_emails,
+            "total_professional": total_professional,
+            "avg_confidence": round(avg_confidence, 3),
+            "top_platforms": dict(top_platforms),
+        },
+        "pinned": sum(1 for e in _search_history if e.get("pinned")),
+        "tagged": sum(1 for e in _search_history if e.get("tags")),
+    }
+
+
 @app.get("/api/dossiers/search")
 async def api_dossier_search(q: str = "", limit: int = 20):
     """Full-text search across all dossier results."""
