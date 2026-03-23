@@ -79,6 +79,11 @@
                     <div class="text-xs text-slate-500">Bulk Jobs</div>
                 </div>
             </div>
+            <div id="search-timeline" class="bg-slate-900 border border-slate-800 rounded-xl p-4 hidden">
+                <h3 class="text-sm font-medium text-slate-400 mb-3">Search Activity (last 24h)</h3>
+                <div id="timeline-bars" class="flex items-end gap-1 h-16"></div>
+                <div class="flex justify-between text-xs text-slate-600 mt-1"><span>00:00</span><span>12:00</span><span>now</span></div>
+            </div>
         </section>
 
         <!-- Search Form -->
@@ -514,6 +519,29 @@
             document.getElementById('dash-scanners').textContent = scanners.available || 0;
             document.getElementById('dash-platforms').textContent = Object.keys(platforms.platforms || {}).length;
             document.getElementById('dash-bulk').textContent = bulk.jobs?.length || 0;
+
+            // Build search activity timeline
+            if (history.history?.length) {
+                const now = new Date();
+                const hours = new Array(24).fill(0);
+                history.history.forEach(h => {
+                    if (h.timestamp) {
+                        const d = new Date(h.timestamp);
+                        const diffHours = (now - d) / 3600000;
+                        if (diffHours < 24) {
+                            hours[23 - Math.floor(diffHours)]++;
+                        }
+                    }
+                });
+                const maxVal = Math.max(...hours, 1);
+                const container = document.getElementById('timeline-bars');
+                container.innerHTML = hours.map(v => {
+                    const h = Math.max(2, (v / maxVal) * 60);
+                    const color = v > 0 ? 'bg-blue-500' : 'bg-slate-800';
+                    return `<div class="${color} rounded-t w-full transition-all" style="height:${h}px" title="${v} searches"></div>`;
+                }).join('');
+                document.getElementById('search-timeline').classList.remove('hidden');
+            }
         } catch (e) {
             console.error('Dashboard load error:', e);
         }
