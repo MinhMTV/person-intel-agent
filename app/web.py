@@ -252,6 +252,24 @@ async def api_add_tag(dossier_id: str, body: dict = Body(...)):
     raise HTTPException(status_code=404, detail="Search not found")
 
 
+@app.post("/api/history/tags/batch")
+async def api_batch_tag(body: dict = Body(...)):
+    """Add a tag to multiple searches at once."""
+    tag = body.get("tag", "").strip().lower()
+    dossier_ids = body.get("dossier_ids", [])
+    if not tag or not dossier_ids:
+        raise HTTPException(status_code=400, detail="Tag and dossier_ids required")
+    tagged = 0
+    for entry in _search_history:
+        if entry.get("id") in dossier_ids:
+            tags = set(entry.get("tags", []))
+            tags.add(tag)
+            entry["tags"] = sorted(tags)
+            _log_activity(entry["id"], "tag", f"{tag} added (batch)")
+            tagged += 1
+    return {"tag": tag, "tagged": tagged}
+
+
 @app.get("/api/history/tags")
 async def api_all_tags():
     """Get all unique tags with counts."""
