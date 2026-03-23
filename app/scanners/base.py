@@ -3,6 +3,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from app.models import PersonQuery, SearchResult, SocialProfile, ImageMatch
+from app.analysis.location import expand_location, build_location_queries
 
 
 class BaseScanner(ABC):
@@ -33,16 +34,27 @@ class BaseScanner(ABC):
         return variants
 
     def location_queries(self, query: PersonQuery) -> list[str]:
-        """Generate location-enhanced search terms."""
+        """Generate location-enhanced search terms with geo-expansion."""
         queries = []
+
+        # Use location intelligence for expansion
         for loc in query.locations:
             for name in self.name_variants(query):
+                # Original location
                 queries.append(f"{name} {loc.raw}")
-                if loc.city:
-                    queries.append(f"{name} {loc.city}")
-                if loc.state:
-                    queries.append(f"{name} {loc.state}")
-                # Geo-expansion (e.g., Oberhausen → NRW → Germany)
+
+                # Expanded terms
+                expansion = expand_location(loc.raw)
+                for term in expansion.search_terms[1:]:  # Skip the original city
+                    queries.append(f"{name} {term}")
+
+                # Existing geo_expansion field
                 for expanded in loc.geo_expansion:
                     queries.append(f"{name} {expanded}")
+
+        # Also handle countries directly
+        for country in query.countries:
+            for name in self.name_variants(query):
+                queries.append(f"{name} {country}")
+
         return queries
