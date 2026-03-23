@@ -213,7 +213,7 @@ async def api_login(platform: str):
 
 @app.get("/api/dossier/{dossier_id}/download")
 async def api_dossier_download(dossier_id: str, fmt: str = "json"):
-    """Download a dossier in JSON or Markdown format."""
+    """Download a dossier in JSON, Markdown, or HTML format."""
     dossier = _dossiers.get(dossier_id)
     if not dossier:
         raise HTTPException(status_code=404, detail="Dossier not found")
@@ -225,6 +225,13 @@ async def api_dossier_download(dossier_id: str, fmt: str = "json"):
         return JSONResponse(
             content=json.loads(content),
             headers={"Content-Disposition": f'attachment; filename="{filename}.json"'},
+        )
+    elif fmt == "html":
+        from app.report_html import generate_html_report
+        html_content = generate_html_report(dossier, dossier_id)
+        return HTMLResponse(
+            content=html_content,
+            headers={"Content-Disposition": f'attachment; filename="{filename}_dossier.html"'},
         )
     else:
         content = dossier.summary()
