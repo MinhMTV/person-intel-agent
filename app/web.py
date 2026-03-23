@@ -36,6 +36,7 @@ from app.models import (
 # Import filter router
 from app.api_filters import router as filter_router
 from app.api_bulk import router as bulk_router
+from app.api_timeline import router as timeline_router
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -57,6 +58,7 @@ app = FastAPI(
 # Include routers
 app.include_router(filter_router)
 app.include_router(bulk_router)
+app.include_router(timeline_router)
 
 # Serve static assets
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
