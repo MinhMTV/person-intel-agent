@@ -87,6 +87,10 @@
                 <div id="timeline-bars" class="flex items-end gap-1 h-16"></div>
                 <div class="flex justify-between text-xs text-slate-600 mt-1"><span>00:00</span><span>12:00</span><span>now</span></div>
             </div>
+            <div id="platforms-chart" class="bg-slate-900 border border-slate-800 rounded-xl p-4 hidden">
+                <h3 class="text-sm font-medium text-slate-400 mb-3">Top Platforms</h3>
+                <div id="platform-bars" class="space-y-1.5"></div>
+            </div>
         </section>
 
         <!-- Search Form -->
@@ -552,6 +556,26 @@
                     return `<div class="${color} rounded-t w-full transition-all" style="height:${h}px" title="${v} searches"></div>`;
                 }).join('');
                 document.getElementById('search-timeline').classList.remove('hidden');
+            }
+
+            // Build top platforms chart
+            const statsResp = await fetch('/api/dossiers/stats');
+            const statsData = await statsResp.json();
+            if (statsData.stats?.top_platforms) {
+                const entries = Object.entries(statsData.stats.top_platforms);
+                const maxCount = entries.length > 0 ? Math.max(...entries.map(e => e[1])) : 1;
+                const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500', 'bg-lime-500'];
+                document.getElementById('platform-bars').innerHTML = entries.map(([name, count], i) => {
+                    const pct = (count / maxCount) * 100;
+                    return `<div class="flex items-center gap-2">
+                        <div class="w-24 text-xs text-slate-400 truncate">${escHtml(name)}</div>
+                        <div class="flex-1 bg-slate-800 rounded-full h-4 overflow-hidden">
+                            <div class="${colors[i % colors.length]} h-full rounded-full transition-all" style="width:${pct}%"></div>
+                        </div>
+                        <div class="w-8 text-xs text-slate-500 text-right">${count}</div>
+                    </div>`;
+                }).join('');
+                document.getElementById('platforms-chart').classList.remove('hidden');
             }
         } catch (e) {
             console.error('Dashboard load error:', e);
