@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -55,6 +55,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # In-memory dossier store (swap for Redis/DB in production)
 _dossiers: dict[str, PersonDossier] = {}
+_search_history: list[dict] = []  # Recent search history
 
 
 # ---------------------------------------------------------------------------
@@ -127,6 +128,21 @@ async def api_search(
     dossier_id = uuid.uuid4().hex[:12]
     _dossiers[dossier_id] = dossier
 
+    # Add to search history
+    _search_history.insert(0, {
+        "id": dossier_id,
+        "name": query.full_name,
+        "timestamp": datetime.utcnow().isoformat(),
+        "results": {
+            "social_profiles": len(dossier.social_profiles),
+            "web_results": len(dossier.web_results),
+            "email_addresses": len(dossier.email_addresses),
+            "image_matches": len(dossier.image_matches),
+        },
+    })
+    # Keep only last 50 searches
+    _search_history[:] = _search_history[:50]
+
     return {
         "id": dossier_id,
         "query": {"name": query.full_name, "locations": loc_list},
@@ -148,6 +164,12 @@ async def api_dossier(dossier_id: str):
     if not dossier:
         raise HTTPException(status_code=404, detail="Dossier not found")
     return JSONResponse(content=json.loads(dossier.model_dump_json()))
+
+
+@app.get("/api/history")
+async def api_history(limit: int = 20):
+    """Return search history."""
+    return {"history": _search_history[:limit]}
 
 
 @app.post("/api/login/{platform}")
@@ -202,6 +224,115 @@ async def api_dossier_download(dossier_id: str, fmt: str = "json"):
         )
 
 
+@app.get("/api/search/stream")
+async def api_search_stream(
+    name: str,
+    locations: str = "",
+    usernames: str = "",
+    nicknames: str = "",
+    email: str = "",
+):
+    """Run a search with real-time SSE progress updates.
+
+    Returns a Server-Sent Events stream with progress for each scanner.
+    """
+    async def event_generator():
+        # Parse fields
+        loc_list = [l.strip() for l in locations.split(",") if l.strip()]
+        user_list = [u.strip() for u in usernames.split(",") if u.strip()]
+        nick_list = [n.strip() for n in nicknames.split(",") if n.strip()]
+        email_list = [e.strip() for e in email.split(",") if e.strip()]
+
+        parts = name.strip().split()
+        query = PersonQuery(
+            full_name=name.strip(),
+            first_name=parts[0] if parts else None,
+            last_name=parts[-1] if len(parts) > 1 else None,
+            nicknames=nick_list,
+            locations=[Location(raw=loc) for loc in loc_list],
+            usernames=user_list,
+            emails=email_list,
+        )
+
+        # Import scanners
+        from app.scanners.social import SocialScanner
+        from app.scanners.web import WebScanner
+        from app.scanners.email import EmailScanner
+        from app.scanners.deep_social import DeepSocialScanner
+        from app.scanners.professional_intel import ProfessionalIntelScanner
+        from app.scanners.public_records import PublicRecordsScanner
+        from app.scanners.data_enrichment import DataEnrichmentScanner
+
+        scanners = [
+            ("social", SocialScanner()),
+            ("web", WebScanner()),
+            ("email", EmailScanner()),
+            ("deep_social", DeepSocialScanner()),
+            ("professional_intel", ProfessionalIntelScanner()),
+            ("public_records", PublicRecordsScanner()),
+            ("data_enrichment", DataEnrichmentScanner()),
+        ]
+
+        dossier = PersonDossier(query=query)
+        total = len(scanners)
+
+        yield f"data: {json.dumps({'type': 'start', 'total': total, 'name': query.full_name})}\n\n"
+
+        for i, (label, scanner) in enumerate(scanners):
+            yield f"data: {json.dumps({'type': 'progress', 'scanner': label, 'current': i+1, 'total': total})}\n\n"
+
+            try:
+                results = await scanner.scan(query)
+                dossier.scanners_used.append(label)
+
+                count = 0
+                for r in results:
+                    count += 1
+                    if isinstance(r, SocialProfile):
+                        dossier.social_profiles.append(r)
+                    elif isinstance(r, ImageMatch):
+                        dossier.image_matches.append(r)
+                    elif isinstance(r, SearchResult):
+                        if r.source == Source.EMAIL or r.source == Source.BREACH:
+                            dossier.email_addresses.append(r.url.replace("mailto:", ""))
+                        elif r.source in (Source.LINKEDIN, Source.XING):
+                            dossier.professional.append(r)
+                        elif r.source == Source.ACADEMIC:
+                            dossier.academic.append(r)
+                        else:
+                            dossier.web_results.append(r)
+
+                yield f"data: {json.dumps({'type': 'scanner_done', 'scanner': label, 'results': count})}\n\n"
+            except Exception as exc:
+                yield f"data: {json.dumps({'type': 'scanner_error', 'scanner': label, 'error': str(exc)})}\n\n"
+
+        # Finalize
+        dossier.total_sources_checked = (
+            len(dossier.web_results) + len(dossier.social_profiles)
+            + len(dossier.email_addresses) + len(dossier.professional) + len(dossier.academic)
+        )
+        total_results = dossier.total_sources_checked + len(dossier.image_matches)
+        if total_results > 0:
+            dossier.confidence_score = min(1.0, total_results / 20)
+
+        # Store
+        dossier_id = uuid.uuid4().hex[:12]
+        _dossiers[dossier_id] = dossier
+
+        summary = {
+            "social_profiles": len(dossier.social_profiles),
+            "web_results": len(dossier.web_results),
+            "email_addresses": len(dossier.email_addresses),
+            "image_matches": len(dossier.image_matches),
+            "professional": len(dossier.professional),
+            "academic": len(dossier.academic),
+        }
+
+        yield f"data: {json.dumps({'type': 'done', 'id': dossier_id, 'results': summary})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
 # ---------------------------------------------------------------------------
 # Scanner runner (shared with CLI)
 # ---------------------------------------------------------------------------
@@ -214,6 +345,11 @@ async def _run_all_scanners(query: PersonQuery) -> PersonDossier:
     from app.scanners.email import EmailScanner
     from app.scanners.professional import ProfessionalScanner
     from app.scanners.advanced_image import AdvancedImageScanner
+    from app.scanners.reverse_image import ReverseImageScanner
+    from app.scanners.deep_social import DeepSocialScanner
+    from app.scanners.professional_intel import ProfessionalIntelScanner
+    from app.scanners.public_records import PublicRecordsScanner
+    from app.scanners.data_enrichment import DataEnrichmentScanner
 
     scanners = [
         ("social", SocialScanner()),
@@ -221,7 +357,12 @@ async def _run_all_scanners(query: PersonQuery) -> PersonDossier:
         ("email", EmailScanner()),
         ("image", ImageScanner()),
         ("advanced_image", AdvancedImageScanner()),
+        ("reverse_image", ReverseImageScanner()),
+        ("deep_social", DeepSocialScanner()),
         ("professional", ProfessionalScanner(headless=True)),
+        ("professional_intel", ProfessionalIntelScanner()),
+        ("public_records", PublicRecordsScanner()),
+        ("data_enrichment", DataEnrichmentScanner()),
     ]
 
     dossier = PersonDossier(query=query)
@@ -241,6 +382,8 @@ async def _run_all_scanners(query: PersonQuery) -> PersonDossier:
                         dossier.email_addresses.append(r.url.replace("mailto:", ""))
                     elif r.source in (Source.LINKEDIN, Source.XING):
                         dossier.professional.append(r)
+                    elif r.source == Source.ACADEMIC:
+                        dossier.academic.append(r)
                     else:
                         dossier.web_results.append(r)
         except Exception as exc:
@@ -250,6 +393,8 @@ async def _run_all_scanners(query: PersonQuery) -> PersonDossier:
         len(dossier.web_results)
         + len(dossier.social_profiles)
         + len(dossier.email_addresses)
+        + len(dossier.professional)
+        + len(dossier.academic)
     )
     # Simple confidence aggregation
     total = dossier.total_sources_checked + len(dossier.image_matches)
