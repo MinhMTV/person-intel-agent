@@ -117,18 +117,28 @@ python -m app.main search "Max Mustermann" --format pdf
 ---
 
 ## Status
-🚧 **Initialisierung** — Projektstruktur erstellt, nächste Schritte:
+✅ **Functional** — Core pipeline complete, 100 tests passing.
 
-1. [ ] Pydantic Models definieren (Person, SearchResult, Profile)
-2. [ ] CLI mit Typer/Click aufsetzen
-3. [ ] Scanner-Interface definieren (BaseScanner)
-4. [ ] Erster Scanner: Web Search (Google)
-5. [ ] Zweiter Scanner: Social Media (Sherlock Wrapper)
-6. [ ] Location Intelligence implementieren
-7. [ ] Image Similarity Pipeline
-8. [ ] Markdown-Dossier Generator
-9. [ ] PDF Export
-10. [ ] OpenClaw Skill Integration
+### Implemented
+- [x] Pydantic Models (Person, SearchResult, SocialProfile, ImageMatch, Dossier)
+- [x] CLI mit Typer (search, login, serve, face_analyze, face_compare, face_batch, ai_analyze)
+- [x] BaseScanner Interface + Name/Location Varianten
+- [x] Scanner: Web Search (DuckDuckGo + Bing + Yandex)
+- [x] Scanner: Social Media (Username-Generierung + Platform-Checks)
+- [x] Scanner: Email (theHarvester Wrapper)
+- [x] Scanner: Professional (LinkedIn/Xing mit Cookie-Auth)
+- [x] Scanner: Advanced Image + Reverse Image Search
+- [x] Scanner: Deep Social + Professional Intel + Public Records
+- [x] Scanner: Data Enrichment
+- [x] Face Engine (DeepFace/ArcFace + dlib + Quality Assessment)
+- [x] AI Analyzer (LLM Integration: Summary, Connections, Narrative, Anomalies)
+- [x] Report Generator (PDF, HTML, JSON, CSV, Markdown)
+- [x] Web App (FastAPI + SSE Progress + Search History)
+- [x] Caching + Rate Limiting + Retry Logic
+- [x] Smart Deduplication (URL/Username/Email across scanners)
+- [x] Location Intelligence (50+ cities: DE/AT/CH/US/UK geo-expansion)
+- [x] Confidence Scoring (source reliability + name match + completeness)
+- [x] 100 Tests (Models, Scanners, Cache, Dedup, Location, Scoring, Face Engine)
 
 ## Nächste Schritte
 1. `requirements.txt` erstellen
