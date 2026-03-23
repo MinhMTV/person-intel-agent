@@ -117,21 +117,42 @@ python -m app.main search "Max Mustermann" --format pdf
 ---
 
 ## Status
-✅ **Production Ready** — Feature-rich webapp, 169 tests passing.
+✅ **Production Ready** — Feature-rich webapp, 208 tests passing.
 
-### Web App Features (v0.4.0)
+### Web App Features (v0.5.0)
 - 🔍 Search with photo upload + auto-complete suggestions
-- 📊 Dashboard (stats, scanners, platforms, bulk jobs)
-- 📋 Results: Social, Web, Images, Professional, Emails, Timeline
-- ⚖️ Compare View (side-by-side dossier comparison)
+- 📊 Dashboard (6 stat cards, search activity chart, top platforms chart, recent dossier)
+- 📋 Results: Social, Web, Images, Professional, Emails, Timeline, Activity
+- ⚖️ Compare View (side-by-side dossier comparison + diff)
 - 📁 Bulk Upload (CSV, real-time progress tracking)
-- 📥 Exports: JSON, HTML Report, Markdown, CSV History, All Dossiers
-- 🔍 Filters: Confidence, Platform, Verified, Bio, Min Similarity
+- 📥 Exports: JSON, HTML Report, Markdown, PDF, CSV History, ZIP (all-in-one)
+- 🔍 Filters: Confidence, Platform, Verified, Bio, Min Similarity, Dossier Search
 - 📈 Analytics Modal (confidence score, platform breakdown)
+- 🛡️ Risk Score (exposure assessment, 0-100, recommendations)
 - 🌓 Dark/Light Theme with persistence
-- ⚡ 11 Scanner Status cards
+- ⚡ 11 Scanner Status cards with rate stats
 - 🕐 Dossier Timeline (chronological view)
-- 📥 Search History export (JSON/CSV)
+- 📥 Search History export (JSON/CSV with notes/tags)
+- 🏷️ Tags + Pins + Notes organization
+- 🔍 Global Dossier Search Widget
+- 🔑 Login Manager (LinkedIn, Xing, Instagram sessions)
+- 🔗 Share Links (read-only dossier sharing)
+- ⌨️ Keyboard Shortcuts (/ or Ctrl+K, Ctrl+E, Ctrl+D, ?, Esc)
+- 📋 Search Templates (7 predefined profiles)
+- 🖥️ VNC Server (remote desktop for VPS)
+
+### Performance
+- 🚀 Async Scanner Execution (11 scanners in parallel via asyncio.gather)
+- 💾 Scanner Caching (30min memory + disk cache)
+- ⏱️ Rate Limiting (domain-based delays)
+- 📊 API Rate Tracking (requests, errors, duration per scanner)
+
+### Analysis Modules
+- Smart Deduplication (URL/Username/Email)
+- Location Intelligence (50+ cities: DE/AT/CH/US/UK)
+- Confidence Scoring
+- Risk Score (exposure assessment)
+- Dossier Diff (compare two scans)
 
 ### API Endpoints (v2)
 - `GET /api/v2/dossier/{id}/filter` — Filter results
@@ -144,12 +165,23 @@ python -m app.main search "Max Mustermann" --format pdf
 - `GET /api/scanners/status` — Scanner health check
 - `GET /api/suggest/names?q=` — Name auto-complete
 - `GET /api/suggest/locations?q=` — Location suggestions
-- `GET /api/dossiers/export-all` — Export all dossiers
-
-### Analysis Modules
-- Smart Deduplication (URL/Username/Email)
-- Location Intelligence (50+ cities: DE/AT/CH/US/UK)
-- Confidence Scoring (source reliability + match quality)
+- `GET /api/dossiers/export-all` — Export all dossiers (JSON/CSV/Markdown)
+- `GET /api/dossier/{id}/risk` — Risk score
+- `GET /api/dossier/{id}/diff/{other_id}` — Dossier diff
+- `GET /api/dossier/{id}/share` — Create share link
+- `GET /api/dossier/{id}/download?fmt=html|markdown|pdf` — Download dossier
+- `GET /api/dossier/{id}/download/zip` — Download as ZIP
+- `GET /api/dossiers/search?q=` — Full-text search across dossiers
+- `GET /api/dossiers/stats` — Dossier statistics
+- `GET /api/sessions` — Login session status
+- `POST /api/sessions/{platform}/cookies` — Upload cookies
+- `GET /api/templates` — Search templates
+- `GET /api/rate-stats` — API rate statistics
+- `POST /api/cache/clear` — Clear scanner cache
+- `GET /api/activity` — Activity log
+- `POST /api/history/pin/{id}` — Pin search
+- `POST /api/history/tags/{id}` — Add/remove tag
+- `POST /api/history/notes/{id}` — Add notes (source reliability + match quality)
 
 ### Implemented
 - [x] Pydantic Models (Person, SearchResult, SocialProfile, ImageMatch, Dossier)
