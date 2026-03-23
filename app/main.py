@@ -225,6 +225,82 @@ def face_batch(
     console.print(table)
 
 
+@app.command()
+def ai_analyze(
+    name: str = typer.Argument(..., help="Full name to search and analyze"),
+    location: list[str] = typer.Option([], "--location", "-l", help="Locations"),
+    username: list[str] = typer.Option([], "--username", "-u", help="Known usernames"),
+    email: list[str] = typer.Option([], "--email", "-e", help="Known emails"),
+    nicknames: list[str] = typer.Option([], "--nick", "-n", help="Nicknames"),
+    scanners: str = typer.Option("social,web,email,deep_social,professional_intel", "--scanners", "-s"),
+    analysis: str = typer.Option("all", "--analysis", "-a", help="Analysis type: summary, connections, narrative, anomalies, next, all"),
+):
+    """Run OSINT search with AI-powered analysis."""
+    from app.ai_analyzer import AIAnalyzer
+
+    # Build query
+    parts = name.split()
+    query = PersonQuery(
+        full_name=name,
+        first_name=parts[0] if parts else None,
+        last_name=parts[-1] if len(parts) > 1 else None,
+        nicknames=list(nicknames),
+        locations=[Location(raw=loc) for loc in location],
+        usernames=list(username),
+        emails=list(email),
+    )
+
+    console.print(f"\n🔍 Searching for: [bold]{name}[/bold]")
+    console.print("   This includes AI analysis...\n")
+
+    # Run scanners
+    dossier = asyncio.run(_run_scanners(query, scanners))
+
+    # Display basic results
+    _display_results(dossier)
+
+    # AI Analysis
+    analyzer = AIAnalyzer()
+    if not analyzer.api_key:
+        console.print("\n[yellow]⚠️ No OpenAI/OpenRouter API key set. Skipping AI analysis.[/yellow]")
+        console.print("   Set OPENAI_API_KEY or OPENROUTER_API_KEY environment variable.")
+        return
+
+    console.print(f"\n[bold cyan]🤖 AI Analysis[/bold cyan]")
+
+    if analysis in ("all", "summary"):
+        console.print("\n[yellow]📊 Executive Summary:[/yellow]")
+        summary = analyzer.summarize(dossier)
+        if summary:
+            console.print(summary)
+        else:
+            console.print("  (LLM not available)")
+
+    if analysis in ("all", "connections"):
+        console.print("\n[yellow]🔗 Connections & Patterns:[/yellow]")
+        connections = analyzer.suggest_connections(dossier)
+        if connections:
+            console.print(connections)
+
+    if analysis in ("all", "narrative"):
+        console.print("\n[yellow]📝 Narrative Report:[/yellow]")
+        narrative = analyzer.generate_narrative_report(dossier)
+        if narrative:
+            console.print(narrative)
+
+    if analysis in ("all", "anomalies"):
+        console.print("\n[yellow]⚠️ Anomaly Detection:[/yellow]")
+        anomalies = analyzer.detect_anomalies(dossier)
+        if anomalies:
+            console.print(anomalies)
+
+    if analysis in ("all", "next"):
+        console.print("\n[yellow]🎯 Suggested Next Steps:[/yellow]")
+        suggestions = analyzer.suggest_next_searches(dossier)
+        if suggestions:
+            console.print(suggestions)
+
+
 async def _run_scanners(query: PersonQuery, scanner_list: str) -> PersonDossier:
     """Run selected scanners."""
     scanner_map = {
