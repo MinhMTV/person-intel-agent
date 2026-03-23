@@ -558,6 +558,34 @@
     }
 
     // =====================================================================
+    // Keyboard Shortcuts
+    // =====================================================================
+    document.addEventListener('keydown', function(e) {
+        if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+        if (e.key === 'k' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            document.getElementById('searchInput')?.focus();
+            showToast('Ctrl+K: Search focused', 'info', 2000);
+        }
+        if (e.key === '/' && !e.ctrlKey) {
+            e.preventDefault();
+            document.getElementById('searchInput')?.focus();
+        }
+        if (e.key === 'e' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            window.open('/api/dossiers/export-all?fmt=json', '_blank');
+            showToast('Ctrl+E: Exporting...', 'info', 2000);
+        }
+        if (e.key === '?' && !e.ctrlKey) {
+            e.preventDefault();
+            showToast('Shortcuts: / or Ctrl+K (search), Ctrl+E (export), Ctrl+D (theme), Esc (close)', 'info', 6000);
+        }
+        if (e.key === 'Escape') {
+            document.activeElement?.blur();
+        }
+    });
+
+    // =====================================================================
     // Bulk Search Upload
     // =====================================================================
     async function showBulkUpload() {
