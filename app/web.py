@@ -300,6 +300,13 @@ async def api_activity(limit: int = 50):
     return {"activity": _activity_log[:limit]}
 
 
+@app.get("/api/rate-stats")
+async def api_rate_stats():
+    """Get API request statistics per scanner."""
+    from app.rate_tracker import tracker
+    return tracker.get_stats()
+
+
 @app.post("/api/cache/clear")
 async def api_cache_clear(body: dict = Body(default={})):
     """Clear scanner cache."""
@@ -724,8 +731,10 @@ async def _run_all_scanners(query: PersonQuery) -> PersonDossier:
     dossier = PersonDossier(query=query)
 
     async def _run_one(label, scanner):
-        """Run a single scanner with caching, return (label, results)."""
+        """Run a single scanner with caching + rate tracking, return (label, results)."""
         from app.cache import get_cached, set_cached
+        from app.rate_tracker import tracker
+        import time
 
         cached = get_cached(query.full_name, label, ttl=1800)
         if cached is not None:
@@ -736,9 +745,11 @@ async def _run_all_scanners(query: PersonQuery) -> PersonDossier:
             except Exception:
                 pass
 
+        start = time.time()
         try:
             results = await asyncio.wait_for(scanner.scan(query), timeout=30)
-            # Cache serializable results
+            duration_ms = (time.time() - start) * 1000
+            tracker.record(label, duration_ms=duration_ms)
             try:
                 serializable = [r.model_dump() if hasattr(r, "model_dump") else r.dict() if hasattr(r, "dict") else str(r) for r in results]
                 set_cached(query.full_name, label, serializable)
@@ -746,6 +757,8 @@ async def _run_all_scanners(query: PersonQuery) -> PersonDossier:
                 pass
             return label, results
         except Exception as exc:
+            duration_ms = (time.time() - start) * 1000
+            tracker.record(label, duration_ms=duration_ms, error=True)
             print(f"Scanner '{label}' failed: {exc}")
             return label, []
 
