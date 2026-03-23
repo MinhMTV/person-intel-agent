@@ -3,6 +3,7 @@
 import os
 import sys
 import json
+import pytest
 
 # Ensure project root on path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -127,6 +128,8 @@ def test_batch_comparison():
 
 def test_dlib_backend():
     """Test dlib backend for comparison."""
+    pytest.importorskip("face_recognition")
+
     print("\n" + "=" * 60)
     print("TEST: dlib Backend Comparison")
     print("=" * 60)

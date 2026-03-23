@@ -10,6 +10,7 @@ from typing import Optional
 import httpx
 
 from app.models import PersonQuery, SearchResult, SocialProfile, ImageMatch, Source, Confidence
+from app.login_manager import load_cookies, save_cookies
 
 
 class LinkedInScraper:
@@ -17,10 +18,6 @@ class LinkedInScraper:
 
     name = "linkedin"
     description = "LinkedIn profile scraper (requires session cookies)"
-
-    # Where to store/load session cookies
-    COOKIE_DIR = Path.home() / ".openclaw" / "workspace" / "plugins" / "person-intel-agent" / "cookies"
-    COOKIE_FILE = COOKIE_DIR / "linkedin_cookies.json"
 
     def __init__(self, headless: bool = True):
         self.headless = headless
@@ -56,12 +53,9 @@ class LinkedInScraper:
 
             # Check if logged in
             if "feed" in page.url or "mynetwork" in page.url:
-                # Save cookies
-                self.COOKIE_DIR.mkdir(parents=True, exist_ok=True)
                 cookies = await context.cookies()
-                import json
-                self.COOKIE_FILE.write_text(json.dumps(cookies, indent=2))
-                print(f"✅ Cookies saved to {self.COOKIE_FILE}")
+                save_cookies("linkedin", cookies)
+                print("✅ LinkedIn cookies saved")
                 await browser.close()
                 return True
             else:
@@ -81,9 +75,8 @@ class LinkedInScraper:
         )
 
         # Load cookies if available
-        if self.COOKIE_FILE.exists():
-            import json
-            cookies = json.loads(self.COOKIE_FILE.read_text())
+        cookies = load_cookies("linkedin")
+        if cookies:
             await context.add_cookies(cookies)
 
         return context
@@ -202,9 +195,6 @@ class XingScraper:
     name = "xing"
     description = "Xing profile scraper (requires session cookies)"
 
-    COOKIE_DIR = Path.home() / ".openclaw" / "workspace" / "plugins" / "person-intel-agent" / "cookies"
-    COOKIE_FILE = COOKIE_DIR / "xing_cookies.json"
-
     def __init__(self, headless: bool = True):
         self.headless = headless
         self._pw = None
@@ -237,11 +227,9 @@ class XingScraper:
             await asyncio.get_event_loop().run_in_executor(None, input)
 
             if "feed" in page.url or "mynetwork" in page.url or "xing.com" in page.url:
-                self.COOKIE_DIR.mkdir(parents=True, exist_ok=True)
                 cookies = await context.cookies()
-                import json
-                self.COOKIE_FILE.write_text(json.dumps(cookies, indent=2))
-                print(f"✅ Cookies saved to {self.COOKIE_FILE}")
+                save_cookies("xing", cookies)
+                print("✅ Xing cookies saved")
                 await browser.close()
                 return True
             else:
@@ -260,9 +248,8 @@ class XingScraper:
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         )
 
-        if self.COOKIE_FILE.exists():
-            import json
-            cookies = json.loads(self.COOKIE_FILE.read_text())
+        cookies = load_cookies("xing")
+        if cookies:
             await context.add_cookies(cookies)
 
         return context

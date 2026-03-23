@@ -74,6 +74,10 @@ class PersonQuery(BaseModel):
     nicknames: list[str] = Field(default_factory=list)
     locations: list[Location] = Field(default_factory=list)
     countries: list[str] = Field(default_factory=list)
+    include_countries: list[str] = Field(default_factory=list)
+    exclude_countries: list[str] = Field(default_factory=list)
+    include_continents: list[str] = Field(default_factory=list)
+    exclude_continents: list[str] = Field(default_factory=list)
     usernames: list[str] = Field(default_factory=list)
     emails: list[str] = Field(default_factory=list)
     photo_path: Optional[str] = None

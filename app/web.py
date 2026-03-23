@@ -39,6 +39,13 @@ from app.api_bulk import router as bulk_router
 from app.api_timeline import router as timeline_router
 from app.api_scanners import router as scanners_router
 from app.api_suggest import router as suggest_router
+from app.login_manager import (
+    delete_session,
+    get_all_sessions,
+    get_login_instructions,
+    import_cookies_from_json,
+    start_interactive_login,
+)
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -103,6 +110,10 @@ async def api_search(
     usernames: str = Form(""),
     nicknames: str = Form(""),
     email: str = Form(""),
+    include_countries: list[str] = Form([]),
+    exclude_countries: list[str] = Form([]),
+    include_continents: list[str] = Form([]),
+    exclude_continents: list[str] = Form([]),
     photo: Optional[UploadFile] = File(None),
 ):
     """Run an OSINT search and return a dossier ID + JSON summary.
@@ -139,6 +150,11 @@ async def api_search(
         last_name=parts[-1] if len(parts) > 1 else None,
         nicknames=nick_list,
         locations=[Location(raw=loc) for loc in loc_list],
+        countries=include_countries,
+        include_countries=include_countries,
+        exclude_countries=exclude_countries,
+        include_continents=include_continents,
+        exclude_continents=exclude_continents,
         usernames=user_list,
         emails=email_list,
         photo_path=photo_path,
@@ -649,33 +665,54 @@ async def api_export_all(fmt: str = "json"):
         )
 
 
+@app.get("/api/sessions")
+async def api_sessions():
+    """Return saved login session status for supported platforms."""
+    return {"sessions": get_all_sessions()}
+
+
+@app.get("/api/sessions/{platform}/login")
+async def api_session_login_info(platform: str):
+    """Return browser-login instructions for a platform."""
+    info = get_login_instructions(platform)
+    if "error" in info:
+        raise HTTPException(status_code=400, detail=info["error"])
+    return info
+
+
+@app.post("/api/sessions/{platform}/login")
+async def api_session_login(platform: str):
+    """Start an interactive Playwright login and save cookies automatically."""
+    result = await start_interactive_login(platform)
+    if result.get("error") and not result.get("success"):
+        return JSONResponse(status_code=400, content=result)
+    return result
+
+
+@app.post("/api/sessions/{platform}/cookies")
+async def api_session_upload_cookies(platform: str, body: dict = Body(...)):
+    """Import cookies for a platform from JSON."""
+    result = import_cookies_from_json(platform, body.get("cookies", ""))
+    if "error" in result:
+        return JSONResponse(status_code=400, content={"success": False, **result})
+    return result
+
+
+@app.delete("/api/sessions/{platform}")
+async def api_session_delete(platform: str):
+    """Delete saved cookies for a platform."""
+    if not delete_session(platform):
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"success": True, "platform": platform}
+
+
 @app.post("/api/login/{platform}")
 async def api_login(platform: str):
-    """Trigger browser-based login for LinkedIn or Xing.
-
-    Opens a visible Chromium window for manual credential entry,
-    then saves session cookies for future authenticated scraping.
-    """
-    if platform not in ("linkedin", "xing"):
-        raise HTTPException(status_code=400, detail="Platform must be 'linkedin' or 'xing'")
-
-    from app.scanners.professional import LinkedInScraper, XingScraper
-
-    async def _do_login():
-        if platform == "linkedin":
-            scraper = LinkedInScraper(headless=False)
-            return await scraper.login_and_save_cookies()
-        else:
-            scraper = XingScraper(headless=False)
-            return await scraper.login_and_save_cookies()
-
-    try:
-        ok = await asyncio.wait_for(_do_login(), timeout=120)
-        return {"platform": platform, "success": ok}
-    except asyncio.TimeoutError:
-        return {"platform": platform, "success": False, "error": "Login timed out (2 min)"}
-    except Exception as e:
-        return {"platform": platform, "success": False, "error": str(e)}
+    """Backward-compatible login alias."""
+    result = await start_interactive_login(platform)
+    if result.get("error") and not result.get("success"):
+        return JSONResponse(status_code=400, content=result)
+    return result
 
 
 @app.get("/api/dossier/{dossier_id}/download")

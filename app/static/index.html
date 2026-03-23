@@ -123,7 +123,7 @@
                   hx-post="/api/search"
                   hx-encoding="multipart/form-data"
                   hx-target="#results-section"
-                  hx-swap="innerHTML"
+                  hx-swap="none"
                   hx-indicator="#search-spinner"
                   class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5">
 
@@ -144,10 +144,10 @@
                     <label class="block text-sm font-medium text-slate-400 mb-1">Locations</label>
                     <div id="locations-container" class="flex flex-wrap gap-2 mb-2"></div>
                     <div class="flex gap-2">
-                        <input type="text" id="location-input" placeholder="e.g. Berlin, NRW"
+                        <input type="text" id="locations-input" placeholder="e.g. Berlin, NRW"
                             class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100
                                    placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <button type="button" onclick="addTag('locations')" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">+ Add</button>
+                        <button type="button" onclick="addSearchChip('locations')" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">+ Add</button>
                     </div>
                     <input type="hidden" name="locations" id="locations-hidden">
                 </div>
@@ -160,7 +160,7 @@
                         <input type="text" id="usernames-input" placeholder="e.g. jsmith, john_smith"
                             class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100
                                    placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <button type="button" onclick="addTag('usernames')" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">+ Add</button>
+                        <button type="button" onclick="addSearchChip('usernames')" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">+ Add</button>
                     </div>
                     <input type="hidden" name="usernames" id="usernames-hidden">
                 </div>
@@ -173,7 +173,7 @@
                         <input type="text" id="nicknames-input" placeholder="e.g. Johnny"
                             class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100
                                    placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <button type="button" onclick="addTag('nicknames')" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">+ Add</button>
+                        <button type="button" onclick="addSearchChip('nicknames')" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">+ Add</button>
                     </div>
                     <input type="hidden" name="nicknames" id="nicknames-hidden">
                 </div>
@@ -184,6 +184,66 @@
                     <input type="text" name="email" placeholder="e.g. john@example.com"
                         class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100
                                placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-slate-800/40 border border-slate-800 rounded-xl p-4 space-y-3">
+                        <div>
+                            <h3 class="text-sm font-medium text-slate-300">Geography Include</h3>
+                            <p class="text-xs text-slate-500">Prioritize these regions during search.</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-2">Continents</label>
+                            <div class="grid grid-cols-2 gap-2 text-sm">
+                                <label class="flex items-center gap-2"><input type="checkbox" name="include_continents" value="Europe" class="rounded bg-slate-900 border-slate-700">Europe</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="include_continents" value="North America" class="rounded bg-slate-900 border-slate-700">North America</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="include_continents" value="South America" class="rounded bg-slate-900 border-slate-700">South America</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="include_continents" value="Asia" class="rounded bg-slate-900 border-slate-700">Asia</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="include_continents" value="Africa" class="rounded bg-slate-900 border-slate-700">Africa</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="include_continents" value="Oceania" class="rounded bg-slate-900 border-slate-700">Oceania</label>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-2">Countries</label>
+                            <div class="grid grid-cols-2 gap-2 text-sm">
+                                <label class="flex items-center gap-2"><input type="checkbox" name="include_countries" value="DE" class="rounded bg-slate-900 border-slate-700">Germany</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="include_countries" value="AT" class="rounded bg-slate-900 border-slate-700">Austria</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="include_countries" value="CH" class="rounded bg-slate-900 border-slate-700">Switzerland</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="include_countries" value="US" class="rounded bg-slate-900 border-slate-700">United States</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="include_countries" value="GB" class="rounded bg-slate-900 border-slate-700">United Kingdom</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="include_countries" value="VN" class="rounded bg-slate-900 border-slate-700">Vietnam</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/40 border border-slate-800 rounded-xl p-4 space-y-3">
+                        <div>
+                            <h3 class="text-sm font-medium text-slate-300">Geography Exclude</h3>
+                            <p class="text-xs text-slate-500">Reduce noise from these regions.</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-2">Continents</label>
+                            <div class="grid grid-cols-2 gap-2 text-sm">
+                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_continents" value="Europe" class="rounded bg-slate-900 border-slate-700">Europe</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_continents" value="North America" class="rounded bg-slate-900 border-slate-700">North America</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_continents" value="South America" class="rounded bg-slate-900 border-slate-700">South America</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_continents" value="Asia" class="rounded bg-slate-900 border-slate-700">Asia</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_continents" value="Africa" class="rounded bg-slate-900 border-slate-700">Africa</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_continents" value="Oceania" class="rounded bg-slate-900 border-slate-700">Oceania</label>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-2">Countries</label>
+                            <div class="grid grid-cols-2 gap-2 text-sm">
+                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_countries" value="DE" class="rounded bg-slate-900 border-slate-700">Germany</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_countries" value="AT" class="rounded bg-slate-900 border-slate-700">Austria</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_countries" value="CH" class="rounded bg-slate-900 border-slate-700">Switzerland</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_countries" value="US" class="rounded bg-slate-900 border-slate-700">United States</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_countries" value="GB" class="rounded bg-slate-900 border-slate-700">United Kingdom</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_countries" value="VN" class="rounded bg-slate-900 border-slate-700">Vietnam</label>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Photo Upload (drag & drop) -->
@@ -327,32 +387,36 @@
     // =====================================================================
     // Tag-based multi-input
     // =====================================================================
-    const tagStore = { locations: [], usernames: [], nicknames: [] };
+    const searchChipStore = { locations: [], usernames: [], nicknames: [] };
 
-    function addTag(field) {
+    function addSearchChip(field) {
         const input = document.getElementById(field + '-input');
+        if (!input) return;
         const val = input.value.trim();
         if (!val) return;
-        tagStore[field].push(val);
+        if (!searchChipStore[field].includes(val)) {
+            searchChipStore[field].push(val);
+        }
         input.value = '';
-        renderTags(field);
+        renderSearchChips(field);
     }
 
-    function removeTag(field, idx) {
-        tagStore[field].splice(idx, 1);
-        renderTags(field);
+    function removeSearchChip(field, idx) {
+        searchChipStore[field].splice(idx, 1);
+        renderSearchChips(field);
     }
 
-    function renderTags(field) {
+    function renderSearchChips(field) {
         const container = document.getElementById(field + '-container');
         const hidden = document.getElementById(field + '-hidden');
-        container.innerHTML = tagStore[field].map((t, i) =>
+        if (!container || !hidden) return;
+        container.innerHTML = searchChipStore[field].map((t, i) =>
             `<span class="inline-flex items-center gap-1 px-3 py-1 bg-slate-800 border border-slate-700 rounded-full text-sm">
                 ${escHtml(t)}
-                <button type="button" onclick="removeTag('${field}',${i})" class="text-slate-500 hover:text-red-400 ml-1">&times;</button>
+                <button type="button" onclick="removeSearchChip('${field}',${i})" class="text-slate-500 hover:text-red-400 ml-1">&times;</button>
             </span>`
         ).join('');
-        hidden.value = tagStore[field].join(',');
+        hidden.value = searchChipStore[field].join(',');
     }
 
     function escHtml(s) {
@@ -366,7 +430,7 @@
         el.addEventListener('keydown', e => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                addTag(el.id.replace('-input', ''));
+                addSearchChip(el.id.replace('-input', ''));
             }
         });
     });
@@ -465,7 +529,7 @@
                         </div>
                         <div class="text-xs text-slate-500">${formatTime(h.timestamp)}</div>
                         ${h.notes ? `<div class="text-xs text-slate-400 mt-0.5 italic">"${escHtml(h.notes.substring(0, 60))}"</div>` : ''}
-                        ${h.tags?.length ? `<div class="flex gap-1 mt-1 flex-wrap">${h.tags.map(t => `<span onclick="event.stopPropagation(); removeTag('${h.id}','${escHtml(t)}')" class="text-xs px-1.5 py-0.5 rounded bg-indigo-900/50 text-indigo-300 hover:bg-indigo-800 cursor-pointer">${escHtml(t)} ×</span>`).join('')}</div>` : ''}
+                        ${h.tags?.length ? `<div class="flex gap-1 mt-1 flex-wrap">${h.tags.map(t => `<span onclick="event.stopPropagation(); removeHistoryTag('${h.id}','${escHtml(t)}')" class="text-xs px-1.5 py-0.5 rounded bg-indigo-900/50 text-indigo-300 hover:bg-indigo-800 cursor-pointer">${escHtml(t)} ×</span>`).join('')}</div>` : ''}
                     </div>
                     <div class="flex flex-col gap-1">
                         <button onclick="event.stopPropagation(); setCompareTarget('${h.id}')" class="text-xs px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 transition" title="Compare">⚖️</button>
@@ -628,17 +692,19 @@
 
     async function loadDashboard() {
         try {
-            const [historyResp, scannersResp, platformsResp, bulkResp] = await Promise.all([
+            const [historyResp, scannersResp, platformsResp, bulkResp, statsResp] = await Promise.all([
                 fetch('/api/history?limit=50'),
                 fetch('/api/scanners/status'),
                 fetch('/api/v2/platforms/summary'),
                 fetch('/api/bulk/jobs'),
+                fetch('/api/dossiers/stats'),
             ]);
 
             const history = await historyResp.json();
             const scanners = await scannersResp.json();
             const platforms = await platformsResp.json();
             const bulk = await bulkResp.json();
+            const statsData = await statsResp.json();
 
             document.getElementById('dash-searches').textContent = history.history?.length || 0;
             document.getElementById('dash-scanners').textContent = scanners.available || 0;
@@ -671,8 +737,6 @@
             }
 
             // Build top platforms chart
-            const statsResp = await fetch('/api/dossiers/stats');
-            const statsData = await statsResp.json();
             if (statsData.stats?.top_platforms) {
                 const entries = Object.entries(statsData.stats.top_platforms);
                 const maxCount = entries.length > 0 ? Math.max(...entries.map(e => e[1])) : 1;
@@ -907,7 +971,7 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
             btn.classList.add('bg-green-800');
             setTimeout(() => { btn.textContent = orig; btn.classList.remove('bg-green-800'); }, 1500);
         } catch (e) {
-            showNotification('Copy failed: ' + e.message, 'error');
+            showToast('Copy failed: ' + e.message, 'error');
         }
     }
 
@@ -1051,9 +1115,9 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
             const resp = await fetch(`/api/dossier/${id}/download?fmt=markdown`);
             const text = await resp.text();
             await navigator.clipboard.writeText(text);
-            showNotification('Dossier copied to clipboard!', 'success');
+            showToast('Dossier copied to clipboard!', 'success');
         } catch (e) {
-            showNotification('Copy failed: ' + e.message, 'error');
+            showToast('Copy failed: ' + e.message, 'error');
         }
     }
 
@@ -1238,6 +1302,129 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
         </div>`;
     }
 
+    function confidenceLabel(score) {
+        if (score >= 0.8) return 'High confidence';
+        if (score >= 0.55) return 'Medium confidence';
+        return 'Low confidence';
+    }
+
+    function scoreClass(score) {
+        if (score >= 0.8) return 'text-green-400';
+        if (score >= 0.55) return 'text-amber-400';
+        return 'text-slate-400';
+    }
+
+    function platformAvatar(platform) {
+        const map = {
+            linkedin: '💼',
+            xing: '🔷',
+            instagram: '📷',
+            facebook: '📘',
+            github: '🐙',
+            twitter: '🐦',
+            web: '🌐',
+        };
+        return map[(platform || '').toLowerCase()] || '👤';
+    }
+
+    function buildImagePreviewMap(dossier) {
+        const previewMap = {};
+        (dossier.image_matches || []).forEach(match => {
+            if (!match?.source_url || !match?.image_url) return;
+            if (!previewMap[match.source_url] || (match.similarity_score || 0) > (previewMap[match.source_url].similarity_score || 0)) {
+                previewMap[match.source_url] = match;
+            }
+        });
+        return previewMap;
+    }
+
+    function queryScopeChips(query) {
+        const chips = [];
+        (query.locations || []).forEach(loc => chips.push({ label: `Location`, value: loc.raw || loc.city || loc.country }));
+        (query.include_continents || []).forEach(v => chips.push({ label: `Include continent`, value: v }));
+        (query.include_countries || []).forEach(v => chips.push({ label: `Include country`, value: v }));
+        (query.exclude_continents || []).forEach(v => chips.push({ label: `Exclude continent`, value: v }));
+        (query.exclude_countries || []).forEach(v => chips.push({ label: `Exclude country`, value: v }));
+        (query.usernames || []).forEach(v => chips.push({ label: `Username`, value: v }));
+        (query.nicknames || []).forEach(v => chips.push({ label: `Nickname`, value: v }));
+        return chips.filter(c => c.value);
+    }
+
+    function renderExecutiveSummary(dossier, resultCounts) {
+        const previewMap = buildImagePreviewMap(dossier);
+        const topProfiles = [...(dossier.social_profiles || [])]
+            .sort((a, b) => {
+                const aScore = { high: 3, medium: 2, low: 1 }[a.confidence] || 0;
+                const bScore = { high: 3, medium: 2, low: 1 }[b.confidence] || 0;
+                return bScore - aScore;
+            })
+            .slice(0, 4);
+        const topImages = [...(dossier.image_matches || [])]
+            .sort((a, b) => (b.similarity_score || 0) - (a.similarity_score || 0))
+            .slice(0, 3);
+        const scope = queryScopeChips(dossier.query || {});
+        const totalResults = (resultCounts.social_profiles || 0) + (resultCounts.web_results || 0) + (resultCounts.image_matches || 0) + (resultCounts.email_addresses || 0);
+
+        return `
+            <div class="px-6 py-6 border-b border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950">
+                <div class="grid lg:grid-cols-[1.4fr,1fr] gap-6">
+                    <div class="space-y-4">
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <div class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">Person Summary</div>
+                                <h2 class="text-2xl font-semibold text-slate-100">${escHtml(dossier.query.full_name)}</h2>
+                                <p class="text-sm text-slate-400 mt-2">Best leads first: profiles, image matches, and strongest confidence signals gathered in one view.</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-xs uppercase tracking-[0.2em] text-slate-500">Overall</div>
+                                <div class="text-3xl font-bold ${scoreClass(dossier.confidence_score || 0)}">${((dossier.confidence_score || 0) * 100).toFixed(0)}%</div>
+                                <div class="text-xs text-slate-500">${confidenceLabel(dossier.confidence_score || 0)}</div>
+                            </div>
+                        </div>
+                        <div class="grid sm:grid-cols-4 gap-3">
+                            <div class="rounded-2xl bg-slate-800/60 border border-slate-700 p-4">
+                                <div class="text-xs text-slate-500 uppercase tracking-wide">Profiles</div>
+                                <div class="text-2xl font-semibold text-blue-300 mt-1">${resultCounts.social_profiles || 0}</div>
+                            </div>
+                            <div class="rounded-2xl bg-slate-800/60 border border-slate-700 p-4">
+                                <div class="text-xs text-slate-500 uppercase tracking-wide">Web Hits</div>
+                                <div class="text-2xl font-semibold text-green-300 mt-1">${resultCounts.web_results || 0}</div>
+                            </div>
+                            <div class="rounded-2xl bg-slate-800/60 border border-slate-700 p-4">
+                                <div class="text-xs text-slate-500 uppercase tracking-wide">Image Matches</div>
+                                <div class="text-2xl font-semibold text-purple-300 mt-1">${resultCounts.image_matches || 0}</div>
+                            </div>
+                            <div class="rounded-2xl bg-slate-800/60 border border-slate-700 p-4">
+                                <div class="text-xs text-slate-500 uppercase tracking-wide">Total Results</div>
+                                <div class="text-2xl font-semibold text-slate-200 mt-1">${totalResults}</div>
+                            </div>
+                        </div>
+                        ${scope.length ? `<div class="flex flex-wrap gap-2">${scope.map(item => `<span class="px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs text-slate-300">${escHtml(item.label)}: ${escHtml(item.value)}</span>`).join('')}</div>` : ''}
+                    </div>
+                    <div class="rounded-2xl bg-slate-800/35 border border-slate-800 p-4">
+                        <div class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-3">Top Leads</div>
+                        <div class="space-y-3">
+                            ${topProfiles.length ? topProfiles.map(profile => {
+                                const preview = previewMap[profile.url];
+                                return `
+                                    <div class="flex items-center gap-3 rounded-xl bg-slate-900/70 border border-slate-800 p-3">
+                                        ${preview?.image_url
+                                            ? `<img src="${escHtml(preview.image_url)}" class="w-12 h-12 rounded-xl object-cover border border-slate-700" onerror="this.replaceWith(document.createElement('div'))">`
+                                            : `<div class="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xl">${platformAvatar(profile.platform)}</div>`}
+                                        <div class="min-w-0 flex-1">
+                                            <a href="${escHtml(profile.url)}" target="_blank" rel="noopener" class="block text-slate-100 font-medium hover:text-blue-300 truncate">${escHtml(profile.display_name || profile.username || profile.platform)}</a>
+                                            <div class="text-xs text-slate-500 truncate">${escHtml(profile.platform)}${profile.username ? ` · @${escHtml(profile.username)}` : ''}</div>
+                                        </div>
+                                        <span class="text-xs px-2 py-1 rounded-full ${confClass(profile.confidence)}">${escHtml(profile.confidence)}</span>
+                                    </div>`;
+                            }).join('') : '<div class="text-sm text-slate-500">No social profile cards yet.</div>'}
+                            ${topImages.length ? `<div class="pt-2 border-t border-slate-800">${topImages.map(match => `<div class="flex items-center justify-between gap-3 py-2"><a href="${escHtml(match.source_url)}" target="_blank" rel="noopener" class="text-sm text-blue-300 truncate">${escHtml(match.context || match.source_url)}</a><span class="text-sm font-semibold ${scoreClass(match.similarity_score || 0)}">${((match.similarity_score || 0) * 100).toFixed(0)}%</span></div>`).join('')}</div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+    }
+
     function renderResults(data) {
         const section = document.getElementById('results-section');
         const d = data.dossier;
@@ -1246,7 +1433,7 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
 
         let tabsHtml = `
         <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-            <!-- Summary bar -->
+            ${renderExecutiveSummary(d, data.results)}
             <div class="px-6 py-4 border-b border-slate-800 flex flex-wrap items-center gap-4">
                 <h2 class="text-lg font-semibold flex-1">Dossier: ${escHtml(d.query.full_name)}</h2>
                 <div id="dossier-notes-display" class="w-full"></div>
@@ -1260,7 +1447,7 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                     <a href="/api/dossier/${data.id}/download?fmt=pdf" target="_blank" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Export PDF">📄 PDF</a>
                     <a href="/api/dossier/${data.id}/download/zip" target="_blank" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Export ZIP">📦 ZIP</a>
                     <button onclick="pinSearch('${data.id}')" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Pin">📌 Pin</button>
-                    <button onclick="addTag('${data.id}')" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Tag">🏷️ Tag</button>
+                    <button onclick="addHistoryTag('${data.id}')" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Tag">🏷️ Tag</button>
                     <button onclick="addNotes('${data.id}')" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Notes">📝 Notes</button>
                     <button onclick="setCompareTarget('${data.id}')" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Compare">⚖️ Compare</button>
                     <button onclick="showRiskScore('${data.id}')" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Risk Score">🛡️ Risk</button>
@@ -1481,13 +1668,17 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
     function renderSocialProfiles(profiles) {
         if (!profiles || !profiles.length) return emptyState('No social profiles found.');
         return `<div class="space-y-3">${profiles.map(p => `
-            <div class="flex items-center gap-4 p-3 bg-slate-800/50 rounded-xl">
-                <div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-sm font-bold uppercase">${escHtml(p.platform?.[0] || '?')}</div>
+            <div class="flex items-center gap-4 p-4 bg-slate-800/50 rounded-2xl border border-slate-800">
+                <div class="w-14 h-14 rounded-2xl bg-slate-700 flex items-center justify-center text-2xl">${platformAvatar(p.platform)}</div>
                 <div class="flex-1 min-w-0">
-                    <a href="${escHtml(p.url)}" target="_blank" rel="noopener" class="text-blue-400 hover:underline font-medium">${escHtml(p.display_name || p.username || p.platform)}</a>
-                    <div class="text-sm text-slate-500 truncate">${escHtml(p.bio || p.platform)}</div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <a href="${escHtml(p.url)}" target="_blank" rel="noopener" class="text-blue-400 hover:underline font-medium">${escHtml(p.display_name || p.username || p.platform)}</a>
+                        ${p.verified ? '<span class="text-xs px-2 py-0.5 rounded-full bg-green-900/50 text-green-300">verified</span>' : ''}
+                        <span class="text-xs px-2 py-0.5 rounded-full ${confClass(p.confidence)}">${escHtml(p.confidence)}</span>
+                    </div>
+                    <div class="text-sm text-slate-500 truncate mt-1">${escHtml(p.platform)}${p.username ? ` · @${escHtml(p.username)}` : ''}</div>
+                    <div class="text-sm text-slate-400 truncate mt-1">${escHtml(p.bio || 'No bio available')}</div>
                 </div>
-                <span class="text-xs px-2 py-0.5 rounded-full ${confClass(p.confidence)}">${escHtml(p.confidence)}</span>
                 <button onclick="copyProfileJson(this, '${escHtml(JSON.stringify(p))}')" class="text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 transition" title="Copy as JSON">📋</button>
             </div>`).join('')}</div>`;
     }
@@ -1506,11 +1697,12 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
     function renderImageMatches(matches) {
         if (!matches || !matches.length) return emptyState('No image matches found.');
         return `<div class="space-y-3">${matches.map(m => `
-            <div class="flex items-center gap-4 p-3 bg-slate-800/50 rounded-xl">
+            <div class="flex items-center gap-4 p-4 bg-slate-800/50 rounded-2xl border border-slate-800">
                 <img src="${escHtml(m.image_url)}" class="w-16 h-16 rounded-lg object-cover border border-slate-700" onerror="this.style.display='none'">
                 <div class="flex-1 min-w-0">
-                    <a href="${escHtml(m.source_url)}" target="_blank" rel="noopener" class="text-blue-400 hover:underline text-sm">${escHtml(m.source_url).substring(0, 60)}…</a>
-                    <div class="text-sm text-slate-500">${escHtml(m.context || '')}</div>
+                    <div class="text-xs uppercase tracking-wide text-slate-500 mb-1">Source</div>
+                    <a href="${escHtml(m.source_url)}" target="_blank" rel="noopener" class="text-blue-400 hover:underline text-sm">${escHtml(m.source_url).substring(0, 80)}${m.source_url.length > 80 ? '…' : ''}</a>
+                    <div class="text-sm text-slate-400 mt-1">${escHtml(m.context || 'Image match found')}</div>
                 </div>
                 <div class="text-right">
                     <div class="text-lg font-bold ${m.similarity_score > 0.8 ? 'text-green-400' : m.similarity_score > 0.6 ? 'text-amber-400' : 'text-slate-400'}">${(m.similarity_score * 100).toFixed(0)}%</div>
@@ -1523,7 +1715,7 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
     function renderProfessional(results) {
         if (!results || !results.length) return emptyState('No professional results found.');
         return `<div class="space-y-3">${results.map(r => `
-            <div class="p-3 bg-slate-800/50 rounded-xl">
+            <div class="p-4 bg-slate-800/50 rounded-2xl border border-slate-800">
                 <a href="${escHtml(r.url)}" target="_blank" rel="noopener" class="text-blue-400 hover:underline font-medium">${escHtml(r.title)}</a>
                 <div class="text-sm text-slate-500 mt-1">${escHtml(r.snippet || r.url)}</div>
                 <button onclick="copyProfileJson(this, '${escHtml(JSON.stringify(r))}')" class="mt-1 text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 transition" title="Copy as JSON">📋</button>
@@ -1533,7 +1725,7 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
     function renderEmails(emails) {
         if (!emails || !emails.length) return emptyState('No email addresses found.');
         return `<div class="space-y-2">${emails.map(e => `
-            <div class="flex items-center gap-3 p-3 bg-slate-800/50 rounded-xl">
+            <div class="flex items-center gap-3 p-3 bg-slate-800/50 rounded-2xl border border-slate-800">
                 <svg class="w-5 h-5 text-slate-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                 </svg>
@@ -1647,11 +1839,14 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
             const data = await resp.json();
             const entry = data.history?.find(h => h.id === id);
             const container = document.getElementById('dossier-notes-display');
-            if (entry?.notes) {
-                container.innerHTML = `<div class="text-sm text-slate-400 italic">📝 "${escHtml(entry.notes)}"</div>`;
-            } else if (entry?.tags?.length) {
-                container.innerHTML = `<div class="flex gap-1">${entry.tags.map(t => `<span class="text-xs px-1.5 py-0.5 rounded bg-indigo-900/50 text-indigo-300">${escHtml(t)}</span>`).join('')}</div>`;
-            }
+            if (!container) return;
+            const notesHtml = entry?.notes
+                ? `<div class="text-sm text-slate-400 italic">📝 "${escHtml(entry.notes)}"</div>`
+                : '';
+            const tagsHtml = entry?.tags?.length
+                ? `<div class="flex gap-1 flex-wrap">${entry.tags.map(t => `<span onclick="removeHistoryTag('${id}','${escHtml(t)}')" class="text-xs px-1.5 py-0.5 rounded bg-indigo-900/50 text-indigo-300 hover:bg-indigo-800 cursor-pointer">${escHtml(t)} ×</span>`).join('')}</div>`
+                : '';
+            container.innerHTML = [notesHtml, tagsHtml].filter(Boolean).join('');
         } catch (e) {}
     }
 
@@ -1734,12 +1929,46 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
         }
     }
 
+    async function addHistoryTag(id) {
+        const tag = prompt('Enter tag:');
+        if (tag === null) return;
+        const clean = tag.trim();
+        if (!clean) return;
+        try {
+            await fetch(`/api/history/tags/${id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tag: clean })
+            });
+            showToast(`Tag updated: ${clean}`, 'success');
+            loadHistory();
+            loadDossierNotes(id);
+        } catch (e) {
+            showToast('Failed to save tag', 'error');
+        }
+    }
+
+    async function removeHistoryTag(id, tag) {
+        try {
+            await fetch(`/api/history/tags/${id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tag })
+            });
+            showToast(`Tag removed: ${tag}`, 'info');
+            loadHistory();
+            loadDossierNotes(id);
+        } catch (e) {
+            showToast('Failed to remove tag', 'error');
+        }
+    }
+
     async function showRiskScore(id) {
         try {
             const resp = await fetch(`/api/dossier/${id}/risk`);
             const data = await resp.json();
-            if (!data.risk) { showToast('No risk data available', 'warning'); return; }
-            const r = data.risk;
+            if (typeof data.score !== 'number') { showToast('No risk data available', 'warning'); return; }
+            const r = data;
             const levelColor = { low: 'text-green-400', moderate: 'text-amber-400', high: 'text-orange-400', critical: 'text-red-400' }[r.level] || 'text-slate-400';
             const recommendations = (r.recommendations || []).map(rec => `<li class="flex items-start gap-2"><span class="text-blue-400 mt-0.5">•</span><span>${escHtml(rec)}</span></li>`).join('');
             showToast(`🛡️ Risk: ${r.score}/100 (${r.level})`, r.level === 'critical' ? 'error' : r.level === 'high' ? 'warning' : 'info', 5000);
@@ -1795,7 +2024,12 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
     // =====================================================================
     // Sessions / Login Manager
     // =====================================================================
+    function closeModalById(id) {
+        document.getElementById(id)?.remove();
+    }
+
     async function showSessionsModal() {
+        closeModalById('sessions-modal');
         const resp = await fetch('/api/sessions');
         const data = await resp.json();
         const sessions = data.sessions || {};
@@ -1804,9 +2038,10 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
             { id: 'linkedin', name: 'LinkedIn', icon: '💼', color: 'text-blue-400' },
             { id: 'xing', name: 'Xing', icon: '🔷', color: 'text-green-400' },
             { id: 'instagram', name: 'Instagram', icon: '📷', color: 'text-pink-400' },
+            { id: 'facebook', name: 'Facebook', icon: '📘', color: 'text-blue-300' },
         ];
 
-        let html = `<div class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)this.remove()">
+        let html = `<div id="sessions-modal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)this.remove()">
             <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-lg font-semibold">🔑 Login Sessions</h2>
@@ -1831,7 +2066,8 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                     ${statusBadge}
                 </div>
                 ${s.saved_at ? `<div class="text-xs text-slate-500 mb-2">Saved: ${s.saved_at} (${s.cookie_count || 0} cookies)</div>` : ''}
-                <div class="flex gap-2">
+                <div class="flex gap-2 flex-wrap">
+                    <button onclick="startPlatformLogin('${p.id}')" class="text-xs px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 rounded-lg transition">🔐 Login</button>
                     <button onclick="deleteSession('${p.id}')" class="text-xs px-3 py-1.5 bg-red-900/50 hover:bg-red-800/50 rounded-lg transition ${s.status === 'not_logged_in' ? 'opacity-50 pointer-events-none' : ''}">🗑️ Logout</button>
                     <button onclick="showCookieUpload('${p.id}')" class="text-xs px-3 py-1.5 bg-blue-900/50 hover:bg-blue-800/50 rounded-lg transition">📤 Upload Cookies</button>
                     <button onclick="showLoginInstructions('${p.id}')" class="text-xs px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg transition">ℹ️ How to Login</button>
@@ -1844,46 +2080,63 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
     }
 
     async function deleteSession(platform) {
-        if (!confirm(\`Delete \${platform} session?\`)) return;
+        if (!confirm(`Delete ${platform} session?`)) return;
         try {
-            await fetch(\`/api/sessions/\${platform}\`, { method: 'DELETE' });
-            showToast(\`\${platform} session deleted\`, 'info');
+            await fetch(`/api/sessions/${platform}`, { method: 'DELETE' });
+            showToast(`${platform} session deleted`, 'info');
             showSessionsModal(); // Refresh
         } catch (e) {
             showToast('Failed to delete session', 'error');
         }
     }
 
+    async function startPlatformLogin(platform) {
+        showToast(`Opening ${platform} login in a browser window. Complete the login there and cookies will be saved automatically.`, 'info', 6000);
+        try {
+            const resp = await fetch(`/api/sessions/${platform}/login`, { method: 'POST' });
+            const data = await resp.json();
+            if (resp.ok && data.success) {
+                showToast(`✅ ${data.name || platform}: ${data.cookie_count || 0} cookies saved`, 'success');
+                showSessionsModal();
+            } else {
+                showToast(data.error || `Login failed for ${platform}`, 'error', 7000);
+            }
+        } catch (e) {
+            showToast(`Failed to start login for ${platform}`, 'error');
+        }
+    }
+
     function showCookieUpload(platform) {
-        const html = \`<div class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)this.remove()">
+        closeModalById('cookie-upload-modal');
+        const html = `<div id="cookie-upload-modal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)this.remove()">
             <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full">
-                <h3 class="font-semibold mb-3">📤 Upload Cookies for \${platform}</h3>
+                <h3 class="font-semibold mb-3">📤 Upload Cookies for ${platform}</h3>
                 <p class="text-sm text-slate-400 mb-3">Paste your cookies as JSON array from browser DevTools (F12 → Application → Cookies → Export)</p>
                 <textarea id="cookieInput" placeholder='[{"name":"sessionid","value":"...","domain":".linkedin.com"}]' rows="6" class="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg text-sm font-mono focus:outline-none focus:border-blue-500"></textarea>
                 <div class="flex gap-2 mt-3">
-                    <button onclick="uploadCookies('\${platform}')" class="flex-1 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition">Upload</button>
+                    <button onclick="uploadCookies('${platform}')" class="flex-1 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition">Upload</button>
                     <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition">Cancel</button>
                 </div>
             </div>
-        </div>\`;
+        </div>`;
         document.body.insertAdjacentHTML('beforeend', html);
     }
 
     async function uploadCookies(platform) {
         const cookies = document.getElementById('cookieInput').value;
         try {
-            const resp = await fetch(\`/api/sessions/\${platform}/cookies\`, {
+            const resp = await fetch(`/api/sessions/${platform}/cookies`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ cookies })
             });
             const data = await resp.json();
             if (data.success) {
-                showToast(\`✅ \${platform}: \${data.cookie_count} cookies saved\`, 'success');
-                document.querySelector('.fixed').remove();
+                showToast(`✅ ${platform}: ${data.cookie_count} cookies saved`, 'success');
+                closeModalById('cookie-upload-modal');
                 showSessionsModal();
             } else {
-                showToast(\`Error: \${data.error}\`, 'error');
+                showToast(`Error: ${data.error}`, 'error');
             }
         } catch (e) {
             showToast('Failed to upload cookies', 'error');
@@ -1891,21 +2144,22 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
     }
 
     async function showLoginInstructions(platform) {
-        const resp = await fetch(\`/api/sessions/\${platform}/login\`);
+        const resp = await fetch(`/api/sessions/${platform}/login`);
         const data = await resp.json();
-        let html = \`<div class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)this.remove()">
+        closeModalById('login-instructions-modal');
+        let html = `<div id="login-instructions-modal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)this.remove()">
             <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto">
-                <h3 class="font-semibold mb-3">\${data.icon} How to Login to \${data.name}</h3>\`;
+                <h3 class="font-semibold mb-3">${data.icon} How to Login to ${data.name}</h3>`;
         if (data.instructions) {
             html += '<ol class="text-sm text-slate-300 space-y-2 mb-4">';
-            data.instructions.forEach(i => { html += \`<li>\${i}</li>\`; });
+            data.instructions.forEach(i => { html += `<li>${i}</li>`; });
             html += '</ol>';
         }
         if (data.playwright_script) {
-            html += \`<details class="mb-3"><summary class="text-sm text-blue-400 cursor-pointer">🐍 Show Playwright Script</summary>
-                <pre class="mt-2 p-3 bg-slate-800 rounded-lg text-xs font-mono overflow-x-auto text-slate-300">\${escHtml(data.playwright_script)}</pre></details>\`;
+            html += `<details class="mb-3"><summary class="text-sm text-blue-400 cursor-pointer">🐍 Show Playwright Script</summary>
+                <pre class="mt-2 p-3 bg-slate-800 rounded-lg text-xs font-mono overflow-x-auto text-slate-300">${escHtml(data.playwright_script)}</pre></details>`;
         }
-        html += \`<button onclick="this.closest('.fixed').remove()" class="w-full py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition">Close</button></div></div>\`;
+        html += `<button onclick="this.closest('.fixed').remove()" class="w-full py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition">Close</button></div></div>`;
         document.body.insertAdjacentHTML('beforeend', html);
     }
 

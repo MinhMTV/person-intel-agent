@@ -42,7 +42,7 @@ Automatisierte Personenrecherche: Gib einen Namen ein, bekomme ein strukturierte
   - `sherlock` / `maigret` — Username-Suche
   - `theHarvester` — E-Mail/Domain-Harvesting
   - `spiderfoot` — Automatisiertes OSINT
-- **Bildanalyse:** DeepFace/ArcFace (512-d), face_recognition (dlib 128-d), OpenCV quality scoring
+- **Bildanalyse:** DeepFace/ArcFace (512-d), optional face_recognition/dlib (128-d), OpenCV quality scoring
 - **Web Scraping:** BeautifulSoup, httpx
 - **Output:** Markdown → PDF (WeasyPrint)
 - **Optional:** OpenClaw Integration (Skill)
@@ -93,7 +93,11 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # Tools installieren
-pip install sherlock-project maigret theHarvester face_recognition
+pip install sherlock-project maigret theHarvester
+
+# Optional: dlib backend fuer FaceEngine
+# macOS: zuerst cmake installieren, z.B. `brew install cmake`
+pip install face_recognition
 ```
 
 ## Usage (geplant)

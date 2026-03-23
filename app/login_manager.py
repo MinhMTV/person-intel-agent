@@ -1,4 +1,4 @@
-"""Login Manager — manage authentication sessions for LinkedIn, Xing, Instagram.
+"""Login Manager — manage authentication sessions for social/professional sites.
 
 Supports:
 - Playwright-based interactive login (headful browser)
@@ -41,11 +41,33 @@ PLATFORMS = {
         "icon": "📷",
         "cookie_domain": ".instagram.com",
     },
+    "facebook": {
+        "name": "Facebook",
+        "login_url": "https://www.facebook.com/login",
+        "check_url": "https://www.facebook.com/",
+        "icon": "📘",
+        "cookie_domain": ".facebook.com",
+    },
 }
 
 
 def _session_file(platform: str) -> Path:
     return _SESSIONS_DIR / f"{platform}.json"
+
+
+def _platform_config(platform: str) -> dict[str, Any] | None:
+    return PLATFORMS.get(platform)
+
+
+def _matching_cookies(cookies: list[dict], cookie_domain: str) -> list[dict]:
+    """Return cookies relevant for the requested platform."""
+    normalized = cookie_domain.lstrip(".")
+    matches = []
+    for cookie in cookies:
+        domain = str(cookie.get("domain", "")).lstrip(".")
+        if domain == normalized or domain.endswith(f".{normalized}"):
+            matches.append(cookie)
+    return matches
 
 
 def get_session_status(platform: str) -> dict:
@@ -126,20 +148,14 @@ def delete_session(platform: str) -> bool:
     return False
 
 
-async def start_interactive_login(platform: str) -> dict:
-    """Start an interactive Playwright login session.
-
-    Returns dict with status and instructions.
-    On VPS: uses VNC for headful browser.
-    Locally: opens browser window.
-    """
-    if platform not in PLATFORMS:
+def get_login_instructions(platform: str) -> dict:
+    """Return login instructions for a supported platform."""
+    config = _platform_config(platform)
+    if not config:
         return {"error": "Unknown platform"}
 
-    config = PLATFORMS[platform]
-
     try:
-        from playwright.async_api import async_playwright
+        import playwright  # noqa: F401
     except ImportError:
         return {"error": "Playwright not installed. Run: pip install playwright && playwright install chromium"}
 
@@ -174,6 +190,64 @@ async def login():
 asyncio.run(login())
 """,
     }
+
+
+async def start_interactive_login(platform: str, timeout_seconds: int = 300) -> dict:
+    """Open a visible browser, wait for login, and save cookies automatically."""
+    config = _platform_config(platform)
+    if not config:
+        return {"platform": platform, "success": False, "error": "Unknown platform"}
+
+    try:
+        from playwright.async_api import async_playwright
+    except ImportError:
+        return {
+            "platform": platform,
+            "success": False,
+            "error": "Playwright not installed. Run: pip install playwright && playwright install chromium",
+        }
+
+    browser = None
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=False)
+            context = await browser.new_context()
+            page = await context.new_page()
+            await page.goto(config["login_url"], wait_until="domcontentloaded")
+
+            deadline = time.time() + timeout_seconds
+            while time.time() < deadline:
+                await page.wait_for_timeout(1500)
+                cookies = await context.cookies()
+                platform_cookies = _matching_cookies(cookies, config["cookie_domain"])
+                current_url = page.url
+                on_login_page = any(token in current_url.lower() for token in ("login", "checkpoint", "challenge"))
+                reached_target = current_url.startswith(config["check_url"])
+
+                if platform_cookies and (reached_target or not on_login_page):
+                    save_cookies(platform, platform_cookies)
+                    return {
+                        "platform": platform,
+                        "success": True,
+                        "name": config["name"],
+                        "cookie_count": len(platform_cookies),
+                        "saved_at": datetime.utcnow().isoformat() + "Z",
+                    }
+
+            return {
+                "platform": platform,
+                "success": False,
+                "name": config["name"],
+                "error": f"Login timed out after {timeout_seconds} seconds",
+            }
+    except Exception as e:
+        return {"platform": platform, "success": False, "name": config["name"], "error": str(e)}
+    finally:
+        if browser is not None:
+            try:
+                await browser.close()
+            except Exception:
+                pass
 
 
 def import_cookies_from_json(platform: str, cookies_json: str) -> dict:

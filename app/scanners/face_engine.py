@@ -121,7 +121,13 @@ class FaceEngine:
     @property
     def face_recognition(self):
         if self._fr is None:
-            import face_recognition as fr
+            try:
+                import face_recognition as fr
+            except ImportError as e:
+                raise RuntimeError(
+                    "The dlib backend requires the optional 'face-recognition' package. "
+                    "Install CMake first, then install 'face-recognition', or use '--backend deepface'."
+                ) from e
             self._fr = fr
         return self._fr
 
