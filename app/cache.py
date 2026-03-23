@@ -251,3 +251,67 @@ def get_rate_limiter() -> RateLimiter:
         _default_limiter.set_domain_delay("scholar.google.com", 3.0)
         _default_limiter.set_domain_delay("www.reddit.com", 2.0)
     return _default_limiter
+
+
+# =============================================================================
+# Scanner Result Cache (for _run_all_scanners)
+# =============================================================================
+_SCANNER_CACHE_DIR = Path("/tmp/pia_cache")
+_SCANNER_CACHE_DIR.mkdir(exist_ok=True)
+
+_scanner_memory_cache: dict[str, tuple[float, Any]] = {}
+SCANNER_CACHE_TTL = 1800  # 30 minutes
+
+
+def _scanner_cache_key(query_name: str, scanner: str) -> str:
+    """Generate a cache key from query name and scanner."""
+    raw = f"{query_name.lower().strip()}::{scanner}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+
+def get_cached(query_name: str, scanner: str, ttl: int = SCANNER_CACHE_TTL) -> Any | None:
+    """Get cached scanner result if available and not expired."""
+    key = _scanner_cache_key(query_name, scanner)
+    if key in _scanner_memory_cache:
+        ts, data = _scanner_memory_cache[key]
+        if time.time() - ts < ttl:
+            return data
+    path = _SCANNER_CACHE_DIR / f"{key}.json"
+    if path.exists():
+        try:
+            stat = path.stat()
+            if time.time() - stat.st_mtime < ttl:
+                data = json.loads(path.read_text())
+                _scanner_memory_cache[key] = (stat.st_mtime, data)
+                return data
+        except Exception:
+            pass
+    return None
+
+
+def set_cached(query_name: str, scanner: str, data: Any) -> None:
+    """Cache a scanner result in memory and on disk."""
+    key = _scanner_cache_key(query_name, scanner)
+    _scanner_memory_cache[key] = (time.time(), data)
+    try:
+        (_SCANNER_CACHE_DIR / f"{key}.json").write_text(json.dumps(data, default=str))
+    except Exception:
+        pass
+
+
+def clear_cache(query_name: str | None = None) -> int:
+    """Clear scanner cache entries."""
+    cleared = 0
+    if query_name:
+        for key in list(_scanner_memory_cache.keys()):
+            path = _SCANNER_CACHE_DIR / f"{key}.json"
+            _scanner_memory_cache.pop(key, None)
+            if path.exists():
+                path.unlink()
+            cleared += 1
+    else:
+        cleared = len(_scanner_memory_cache)
+        _scanner_memory_cache.clear()
+        for f in _SCANNER_CACHE_DIR.glob("*.json"):
+            f.unlink()
+    return cleared

@@ -300,6 +300,15 @@ async def api_activity(limit: int = 50):
     return {"activity": _activity_log[:limit]}
 
 
+@app.post("/api/cache/clear")
+async def api_cache_clear(body: dict = Body(default={})):
+    """Clear scanner cache."""
+    from app.cache import clear_cache
+    query_name = body.get("query")
+    cleared = clear_cache(query_name)
+    return {"cleared": cleared}
+
+
 @app.get("/api/history/export")
 async def api_history_export(fmt: str = "json"):
     """Export search history as JSON or CSV."""
@@ -616,6 +625,8 @@ async def _run_all_scanners(query: PersonQuery) -> PersonDossier:
     from app.analysis.dedup import dedup_all
     from app.analysis.scoring import apply_confidence_scores
 
+    import asyncio
+
     scanners = [
         ("social", SocialScanner()),
         ("web", WebScanner()),
@@ -632,26 +643,54 @@ async def _run_all_scanners(query: PersonQuery) -> PersonDossier:
 
     dossier = PersonDossier(query=query)
 
-    for label, scanner in scanners:
+    async def _run_one(label, scanner):
+        """Run a single scanner with caching, return (label, results)."""
+        from app.cache import get_cached, set_cached
+
+        cached = get_cached(query.full_name, label, ttl=1800)
+        if cached is not None:
+            try:
+                return label, [SocialProfile(**r) if "platform" in r and "url" in r else
+                              ImageMatch(**r) if "image_url" in r else
+                              SearchResult(**r) for r in cached]
+            except Exception:
+                pass
+
         try:
-            results = await scanner.scan(query)
-            dossier.scanners_used.append(label)
-            for r in results:
-                if isinstance(r, SocialProfile):
-                    dossier.social_profiles.append(r)
-                elif isinstance(r, ImageMatch):
-                    dossier.image_matches.append(r)
-                elif isinstance(r, SearchResult):
-                    if r.source == Source.EMAIL or r.source == Source.BREACH:
-                        dossier.email_addresses.append(r.url.replace("mailto:", ""))
-                    elif r.source in (Source.LINKEDIN, Source.XING):
-                        dossier.professional.append(r)
-                    elif r.source == Source.ACADEMIC:
-                        dossier.academic.append(r)
-                    else:
-                        dossier.web_results.append(r)
+            results = await asyncio.wait_for(scanner.scan(query), timeout=30)
+            # Cache serializable results
+            try:
+                serializable = [r.model_dump() if hasattr(r, "model_dump") else r.dict() if hasattr(r, "dict") else str(r) for r in results]
+                set_cached(query.full_name, label, serializable)
+            except Exception:
+                pass
+            return label, results
         except Exception as exc:
             print(f"Scanner '{label}' failed: {exc}")
+            return label, []
+
+    tasks = [_run_one(label, scanner) for label, scanner in scanners]
+    completed = await asyncio.gather(*tasks, return_exceptions=True)
+
+    for result in completed:
+        if isinstance(result, Exception):
+            continue
+        label, results = result
+        dossier.scanners_used.append(label)
+        for r in results:
+            if isinstance(r, SocialProfile):
+                dossier.social_profiles.append(r)
+            elif isinstance(r, ImageMatch):
+                dossier.image_matches.append(r)
+            elif isinstance(r, SearchResult):
+                if r.source == Source.EMAIL or r.source == Source.BREACH:
+                    dossier.email_addresses.append(r.url.replace("mailto:", ""))
+                elif r.source in (Source.LINKEDIN, Source.XING):
+                    dossier.professional.append(r)
+                elif r.source == Source.ACADEMIC:
+                    dossier.academic.append(r)
+                else:
+                    dossier.web_results.append(r)
 
     # Deduplicate results
     deduped = dedup_all(
