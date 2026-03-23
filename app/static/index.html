@@ -984,6 +984,7 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                     <span class="px-2 py-1 rounded bg-amber-900/50 text-amber-300">${data.results.email_addresses} Emails</span>
                     <a href="/api/dossier/${data.id}/download?fmt=html" target="_blank" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Export HTML">📥 HTML</a>
                     <a href="/api/dossier/${data.id}/download?fmt=markdown" target="_blank" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Export MD">📥 MD</a>
+                    <a href="/api/dossier/${data.id}/download?fmt=pdf" target="_blank" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Export PDF">📄 PDF</a>
                     <button onclick="pinSearch('${data.id}')" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Pin">📌 Pin</button>
                     <button onclick="addTag('${data.id}')" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Tag">🏷️ Tag</button>
                     <button onclick="addNotes('${data.id}')" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Notes">📝 Notes</button>

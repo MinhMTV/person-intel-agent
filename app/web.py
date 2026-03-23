@@ -488,6 +488,14 @@ async def api_dossier_download(dossier_id: str, fmt: str = "json"):
             content=html_content,
             headers={"Content-Disposition": f'attachment; filename="{filename}_dossier.html"'},
         )
+    elif fmt == "pdf":
+        from app.report_pdf import generate_pdf
+        pdf_bytes = generate_pdf(dossier)
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}_dossier.pdf"'},
+        )
     else:
         content = dossier.summary()
         return HTMLResponse(
