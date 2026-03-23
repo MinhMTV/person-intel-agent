@@ -14,6 +14,7 @@ from app.scanners.image import ImageScanner
 from app.scanners.email import EmailScanner
 from app.scanners.professional import ProfessionalScanner, LinkedInScraper, XingScraper
 from app.scanners.advanced_image import AdvancedImageScanner
+from app.scanners.reverse_image import ReverseImageScanner
 
 console = Console()
 app = typer.Typer(help="Person Intelligence Agent — Automated OSINT Dossier Generator")
@@ -28,7 +29,7 @@ def search(
     email: list[str] = typer.Option([], "--email", "-e", help="Known email addresses"),
     photo: str = typer.Option(None, "--photo", "-p", help="Path to photo for image search"),
     nicknames: list[str] = typer.Option([], "--nick", "-n", help="Nicknames"),
-    scanners: str = typer.Option("social,web,email,image,professional", "--scanners", "-s", help="Comma-separated scanners"),
+    scanners: str = typer.Option("social,web,email,image,advanced_image,reverse_image", "--scanners", "-s", help="Comma-separated scanners"),
     output_format: str = typer.Option("markdown", "--format", "-f", help="Output format: markdown, pdf, json"),
 ):
     """Search for a person and generate an intelligence dossier."""
@@ -227,6 +228,7 @@ async def _run_scanners(query: PersonQuery, scanner_list: str) -> PersonDossier:
         "email": EmailScanner(),
         "image": ImageScanner(),
         "advanced_image": AdvancedImageScanner(),
+        "reverse_image": ReverseImageScanner(),
         "professional": ProfessionalScanner(headless=True),
     }
 
