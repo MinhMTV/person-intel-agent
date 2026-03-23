@@ -255,6 +255,7 @@
                     <input type="text" id="historyFilter" placeholder="Filter history..." oninput="filterHistory()" class="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm w-40 focus:outline-none focus:border-blue-500 transition">
                     <a href="/api/history/export?fmt=csv" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">📥 CSV</a>
                     <a href="/api/history/export?fmt=json" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">📥 JSON</a>
+                    <button onclick="copyHistoryJson()" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">📋 Copy</button>
                     <a href="/api/dossiers/export-all?fmt=json" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">📦 Export All</a>
                     <button onclick="showBulkUpload()" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">📁 Bulk Upload</button>
                     <button onclick="showSessionsModal()" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">🔑 Logins</button>
@@ -906,6 +907,15 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
         } catch (e) {
             showNotification('Copy failed: ' + e.message, 'error');
         }
+    }
+
+    async function copyHistoryJson() {
+        try {
+            const resp = await fetch('/api/history/export?fmt=json');
+            const data = await resp.json();
+            await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+            showToast(`📋 ${data.history?.length || 0} history items copied as JSON`, 'success', 3000);
+        } catch (e) { showToast('Copy failed: ' + e.message, 'error'); }
     }
 
     async function copyAllResults() {
