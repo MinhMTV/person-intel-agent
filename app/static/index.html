@@ -77,12 +77,15 @@
                   class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5">
 
                 <!-- Name (required) -->
-                <div>
+                <div class="relative">
                     <label class="block text-sm font-medium text-slate-400 mb-1">Full Name <span class="text-red-400">*</span></label>
-                    <input type="text" name="name" required
+                    <input type="text" name="name" required id="name-input"
                         placeholder="e.g. John Smith"
+                        oninput="suggestNames(this.value)"
+                        onblur="setTimeout(() => hideSuggestions(), 200)"
                         class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100
                                placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <div id="name-suggestions" class="absolute z-20 w-full bg-slate-800 border border-slate-700 rounded-lg mt-1 shadow-xl hidden max-h-48 overflow-y-auto"></div>
                 </div>
 
                 <!-- Locations (multi-input) -->
@@ -204,6 +207,53 @@
     </footer>
 
     <script>
+    // =====================================================================
+    // Search Suggestions
+    // =====================================================================
+    let suggestTimeout = null;
+
+    async function suggestNames(query) {
+        clearTimeout(suggestTimeout);
+        const container = document.getElementById('name-suggestions');
+
+        if (!query || query.length < 1) {
+            container.classList.add('hidden');
+            return;
+        }
+
+        suggestTimeout = setTimeout(async () => {
+            try {
+                const resp = await fetch(`/api/suggest/names?q=${encodeURIComponent(query)}`);
+                const data = await resp.json();
+
+                if (!data.suggestions?.length) {
+                    container.classList.add('hidden');
+                    return;
+                }
+
+                container.innerHTML = data.suggestions.map(s => `
+                    <div class="px-4 py-2 hover:bg-slate-700 cursor-pointer text-sm"
+                         onclick="selectSuggestion('${escHtml(s.name)}')">
+                        <span class="text-slate-200">${escHtml(s.name)}</span>
+                        ${s.results_count ? `<span class="text-slate-500 text-xs ml-2">${s.results_count} results</span>` : ''}
+                    </div>
+                `).join('');
+                container.classList.remove('hidden');
+            } catch (e) {
+                container.classList.add('hidden');
+            }
+        }, 200);
+    }
+
+    function selectSuggestion(name) {
+        document.getElementById('name-input').value = name;
+        document.getElementById('name-suggestions').classList.add('hidden');
+    }
+
+    function hideSuggestions() {
+        document.getElementById('name-suggestions').classList.add('hidden');
+    }
+
     // =====================================================================
     // Tag-based multi-input
     // =====================================================================
