@@ -908,6 +908,20 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
         }
     }
 
+    async function copyAllResults() {
+        const d = await fetch(`/api/dossier/${currentDossierId}`).then(r => r.json()).then(j => j.dossier);
+        if (!d) return;
+        const all = {
+            social_profiles: d.social_profiles,
+            web_results: d.web_results,
+            image_matches: d.image_matches,
+            professional: d.professional,
+            email_addresses: d.email_addresses,
+        };
+        await navigator.clipboard.writeText(JSON.stringify(all, null, 2));
+        showToast(`📋 All results (${Object.values(all).flat().length}) copied as JSON`, 'success', 3000);
+    }
+
     async function copyDossierZip() {
         try {
             const resp = await fetch(`/api/dossier/${currentDossierId}/download/zip`);
@@ -1242,6 +1256,7 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                             <div class="border-t border-slate-700 my-1"></div>
                             <button onclick="copyAllUrls()" class="w-full text-left px-3 py-1.5 text-sm hover:bg-slate-700 transition">🔗 All URLs</button>
                             <button onclick="copyDossierSummary()" class="w-full text-left px-3 py-1.5 text-sm hover:bg-slate-700 transition">📝 Summary</button>
+                            <button onclick="copyAllResults()" class="w-full text-left px-3 py-1.5 text-sm hover:bg-slate-700 transition">📦 All Results</button>
                         </div>
                     </div>
                 </div>
