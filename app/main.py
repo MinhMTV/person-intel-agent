@@ -18,6 +18,7 @@ from app.scanners.reverse_image import ReverseImageScanner
 from app.scanners.deep_social import DeepSocialScanner
 from app.scanners.professional_intel import ProfessionalIntelScanner
 from app.scanners.public_records import PublicRecordsScanner
+from app.scanners.data_enrichment import DataEnrichmentScanner
 
 console = Console()
 app = typer.Typer(help="Person Intelligence Agent — Automated OSINT Dossier Generator")
@@ -236,6 +237,7 @@ async def _run_scanners(query: PersonQuery, scanner_list: str) -> PersonDossier:
         "professional": ProfessionalScanner(headless=True),
         "professional_intel": ProfessionalIntelScanner(),
         "public_records": PublicRecordsScanner(),
+        "data_enrichment": DataEnrichmentScanner(),
     }
 
     selected = [s.strip() for s in scanner_list.split(",")]
