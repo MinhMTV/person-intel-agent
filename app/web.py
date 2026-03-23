@@ -33,6 +33,9 @@ from app.models import (
     Source,
 )
 
+# Import filter router
+from app.api_filters import router as filter_router
+
 # ---------------------------------------------------------------------------
 # App setup
 # ---------------------------------------------------------------------------
@@ -47,8 +50,11 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 app = FastAPI(
     title="Person Intel Agent",
     description="Automated OSINT Dossier Generator — Web Interface",
-    version="0.2.0",
+    version="0.3.0",
 )
+
+# Include filter router
+app.include_router(filter_router)
 
 # Serve static assets
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -338,7 +344,7 @@ async def api_search_stream(
 # ---------------------------------------------------------------------------
 
 async def _run_all_scanners(query: PersonQuery) -> PersonDossier:
-    """Run all available scanners and aggregate results."""
+    """Run all available scanners and aggregate results with dedup + scoring."""
     from app.scanners.social import SocialScanner
     from app.scanners.web import WebScanner
     from app.scanners.image import ImageScanner
@@ -350,6 +356,8 @@ async def _run_all_scanners(query: PersonQuery) -> PersonDossier:
     from app.scanners.professional_intel import ProfessionalIntelScanner
     from app.scanners.public_records import PublicRecordsScanner
     from app.scanners.data_enrichment import DataEnrichmentScanner
+    from app.analysis.dedup import dedup_all
+    from app.analysis.scoring import apply_confidence_scores
 
     scanners = [
         ("social", SocialScanner()),
@@ -377,7 +385,6 @@ async def _run_all_scanners(query: PersonQuery) -> PersonDossier:
                 elif isinstance(r, ImageMatch):
                     dossier.image_matches.append(r)
                 elif isinstance(r, SearchResult):
-                    # Classify by source
                     if r.source == Source.EMAIL or r.source == Source.BREACH:
                         dossier.email_addresses.append(r.url.replace("mailto:", ""))
                     elif r.source in (Source.LINKEDIN, Source.XING):
@@ -389,6 +396,31 @@ async def _run_all_scanners(query: PersonQuery) -> PersonDossier:
         except Exception as exc:
             print(f"Scanner '{label}' failed: {exc}")
 
+    # Deduplicate results
+    deduped = dedup_all(
+        social=dossier.social_profiles,
+        web=dossier.web_results,
+        images=dossier.image_matches,
+        emails=dossier.email_addresses,
+        professional=dossier.professional,
+        academic=dossier.academic,
+    )
+    dossier.social_profiles = deduped["social_profiles"]
+    dossier.web_results = deduped["web_results"]
+    dossier.image_matches = deduped["image_matches"]
+    dossier.email_addresses = deduped["email_addresses"]
+    dossier.professional = deduped["professional"]
+    dossier.academic = deduped["academic"]
+
+    # Apply confidence scores
+    scored = apply_confidence_scores(
+        social_profiles=dossier.social_profiles,
+        web_results=dossier.web_results,
+        image_matches=dossier.image_matches,
+        query=query,
+    )
+    dossier.confidence_score = scored["overall_confidence"]
+
     dossier.total_sources_checked = (
         len(dossier.web_results)
         + len(dossier.social_profiles)
@@ -396,9 +428,5 @@ async def _run_all_scanners(query: PersonQuery) -> PersonDossier:
         + len(dossier.professional)
         + len(dossier.academic)
     )
-    # Simple confidence aggregation
-    total = dossier.total_sources_checked + len(dossier.image_matches)
-    if total > 0:
-        dossier.confidence_score = min(1.0, total / 20)
 
     return dossier
