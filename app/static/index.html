@@ -237,6 +237,7 @@
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-lg font-semibold text-slate-300">Search History</h2>
                 <div class="flex gap-2">
+                    <input type="text" id="historyFilter" placeholder="Filter history..." oninput="filterHistory()" class="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm w-40 focus:outline-none focus:border-blue-500 transition">
                     <a href="/api/history/export?fmt=csv" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">📥 CSV</a>
                     <a href="/api/history/export?fmt=json" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">📥 JSON</a>
                     <a href="/api/dossiers/export-all?fmt=json" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">📦 Export All</a>
@@ -458,6 +459,15 @@
         } catch (e) {
             console.error('Failed to load history:', e);
         }
+    }
+
+    function filterHistory() {
+        const q = document.getElementById('historyFilter').value.toLowerCase();
+        const items = document.querySelectorAll('#history-list > div');
+        items.forEach(el => {
+            const text = el.textContent.toLowerCase();
+            el.style.display = text.includes(q) ? '' : 'none';
+        });
     }
 
     async function loadDossier(id) {
