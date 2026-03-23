@@ -896,6 +896,18 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
     // =====================================================================
     let compareHistoryCache = [];
 
+    async function copyProfileJson(btn, jsonStr) {
+        try {
+            await navigator.clipboard.writeText(jsonStr);
+            const orig = btn.textContent;
+            btn.textContent = '✅';
+            btn.classList.add('bg-green-800');
+            setTimeout(() => { btn.textContent = orig; btn.classList.remove('bg-green-800'); }, 1500);
+        } catch (e) {
+            showNotification('Copy failed: ' + e.message, 'error');
+        }
+    }
+
     async function copyDossierMarkdown(id) {
         try {
             const resp = await fetch(`/api/dossier/${id}/download?fmt=markdown`);
@@ -1276,6 +1288,7 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                     <div class="text-sm text-slate-500 truncate">${escHtml(p.bio || p.platform)}</div>
                 </div>
                 <span class="text-xs px-2 py-0.5 rounded-full ${confClass(p.confidence)}">${escHtml(p.confidence)}</span>
+                <button onclick="copyProfileJson(this, '${escHtml(JSON.stringify(p))}')" class="text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 transition" title="Copy as JSON">📋</button>
             </div>`).join('')}</div>`;
     }
 
