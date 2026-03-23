@@ -213,6 +213,44 @@ async def api_history_export(fmt: str = "json"):
         )
 
 
+@app.get("/api/dossiers/export-all")
+async def api_export_all(fmt: str = "json"):
+    """Export all dossiers as a single JSON or concatenated Markdown."""
+    import io
+
+    if not _dossiers:
+        return {"error": "No dossiers to export"}
+
+    if fmt == "json":
+        all_data = {}
+        for did, d in _dossiers.items():
+            all_data[did] = {
+                "name": d.query.full_name,
+                "confidence": d.confidence_score,
+                "social_profiles": len(d.social_profiles),
+                "web_results": len(d.web_results),
+                "image_matches": len(d.image_matches),
+                "email_addresses": len(d.email_addresses),
+                "dossier": json.loads(d.model_dump_json()),
+            }
+        return JSONResponse(
+            content=all_data,
+            headers={"Content-Disposition": 'attachment; filename="all_dossiers.json"'},
+        )
+    else:
+        parts = []
+        for did, d in _dossiers.items():
+            parts.append(f"# Dossier: {d.query.full_name}\n")
+            parts.append(f"ID: {did}\nConfidence: {d.confidence_score:.1%}\n\n")
+            parts.append(d.summary())
+            parts.append("\n---\n\n")
+        content = "\n".join(parts)
+        return HTMLResponse(
+            content=f"<pre>{content}</pre>",
+            headers={"Content-Disposition": 'attachment; filename="all_dossiers.md"'},
+        )
+
+
 @app.post("/api/login/{platform}")
 async def api_login(platform: str):
     """Trigger browser-based login for LinkedIn or Xing.
