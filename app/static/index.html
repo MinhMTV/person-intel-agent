@@ -1295,10 +1295,11 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
     function renderWebResults(results) {
         if (!results || !results.length) return emptyState('No web results found.');
         return `<div class="space-y-3">${results.slice(0, 20).map(r => `
-            <div class="p-3 bg-slate-800/50 rounded-xl">
+            <div class="p-3 bg-slate-800/50 rounded-xl relative">
                 <a href="${escHtml(r.url)}" target="_blank" rel="noopener" class="text-blue-400 hover:underline font-medium">${escHtml(r.title)}</a>
                 <div class="text-sm text-slate-500 truncate mt-1">${escHtml(r.snippet || r.url)}</div>
                 <div class="text-xs text-slate-600 mt-1">${escHtml(r.source)} · ${escHtml(r.confidence)}</div>
+                <button onclick="copyProfileJson(this, '${escHtml(JSON.stringify(r))}')" class="absolute top-3 right-3 text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 transition" title="Copy as JSON">📋</button>
             </div>`).join('')}</div>`;
     }
 
