@@ -549,6 +549,14 @@
             const data = await resp.json();
             const grid = document.getElementById('scanner-grid');
 
+            // Load rate stats
+            let rateStats = {};
+            try {
+                const rateResp = await fetch('/api/rate-stats');
+                const rateData = await rateResp.json();
+                rateStats = rateData.scanners || {};
+            } catch (e) {}
+
             grid.innerHTML = data.scanners.map(s => {
                 const statusColor = s.status === 'available'
                     ? 'bg-green-900/30 border-green-500/30 text-green-300'
@@ -556,17 +564,22 @@
                 const statusIcon = s.status === 'available' ? '✅' : '❌';
                 const typeIcon = s.type === 'browser' ? '🌐' : '⚡';
                 const authBadge = s.requires_auth ? '<span class="text-amber-400 text-xs ml-1">🔑</span>' : '';
+                const statKey = s.id?.replace('_scanner', '') || s.name?.toLowerCase().replace(' ', '_');
+                const stats = rateStats[statKey] || {};
 
                 return `
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 ${statusColor.replace('text-', 'hover:border-').split(' ')[0] || ''}">
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-3">
                     <div class="flex items-center gap-2 mb-1">
                         <span>${statusIcon}</span>
                         <span class="font-medium text-sm">${escHtml(s.name)}</span>
                         ${authBadge}
                     </div>
                     <div class="text-xs text-slate-500">${escHtml(s.description).substring(0, 60)}</div>
-                    <div class="flex items-center gap-1 mt-1">
+                    <div class="flex items-center gap-1 mt-1 flex-wrap">
                         <span class="text-xs px-1.5 py-0.5 rounded bg-slate-800">${typeIcon} ${s.type}</span>
+                        ${stats.total_requests ? `<span class="text-xs px-1.5 py-0.5 rounded bg-blue-900/30 text-blue-300">${stats.total_requests} req</span>` : ''}
+                        ${stats.avg_duration_ms ? `<span class="text-xs px-1.5 py-0.5 rounded bg-slate-800">${stats.avg_duration_ms}ms</span>` : ''}
+                        ${stats.errors ? `<span class="text-xs px-1.5 py-0.5 rounded bg-red-900/30 text-red-300">${stats.errors} err</span>` : ''}
                     </div>
                 </div>`;
             }).join('');
