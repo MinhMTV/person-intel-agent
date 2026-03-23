@@ -165,6 +165,7 @@
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-lg font-semibold text-slate-300">Search History</h2>
                 <div class="flex gap-2">
+                    <button onclick="showBulkUpload()" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">📁 Bulk Upload</button>
                     <button onclick="showCompareDialog()" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">⚖️ Compare</button>
                     <button onclick="loadHistory()" class="text-sm text-slate-500 hover:text-slate-300 transition">↻ Refresh</button>
                 </div>
@@ -347,6 +348,158 @@
 
     // Load history on page load
     loadHistory();
+
+    // =====================================================================
+    // Bulk Search Upload
+    // =====================================================================
+    async function showBulkUpload() {
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+        modal.innerHTML = `
+            <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-6 space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-semibold">📁 Bulk Search</h3>
+                    <button onclick="this.closest('.fixed').remove()" class="text-slate-500 hover:text-white text-xl">&times;</button>
+                </div>
+                <div class="bg-slate-800 rounded-xl p-4 text-sm text-slate-400">
+                    <p class="font-medium text-slate-300 mb-2">CSV Format:</p>
+                    <code class="block bg-slate-900 rounded p-2 text-xs font-mono">name,locations,usernames,nicknames,email
+John Smith,"Berlin,Munich",jsmith,Johnny,john@test.com
+Jane Doe,Hamburg,jdoe,,jane@test.com</code>
+                    <p class="mt-2">Max 100 rows. Columns: <strong>name</strong> (required), others optional.</p>
+                </div>
+                <div id="bulk-drop-zone" class="border-2 border-dashed border-slate-700 rounded-xl p-8 text-center cursor-pointer hover:border-blue-500 transition"
+                     onclick="document.getElementById('bulk-csv-input').click()">
+                    <svg class="w-10 h-10 mx-auto mb-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                    <p class="text-slate-400 text-sm">Drop CSV here or <span class="text-blue-400">click to browse</span></p>
+                    <input type="file" id="bulk-csv-input" accept=".csv" class="hidden" onchange="handleBulkFile(this.files[0])">
+                </div>
+                <div id="bulk-file-info" class="hidden flex items-center gap-3 p-3 bg-slate-800 rounded-xl">
+                    <span class="text-sm text-slate-300" id="bulk-filename"></span>
+                    <button onclick="clearBulkFile()" class="text-red-400 text-sm ml-auto">✕</button>
+                </div>
+                <button id="bulk-start-btn" onclick="startBulkSearch()" disabled
+                    class="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-medium transition">
+                    Start Bulk Search
+                </button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        // Setup drag & drop
+        const dropZone = modal.querySelector('#bulk-drop-zone');
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-blue-500'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-blue-500'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-500');
+            if (e.dataTransfer.files.length) handleBulkFile(e.dataTransfer.files[0]);
+        });
+    }
+
+    let bulkFile = null;
+
+    function handleBulkFile(file) {
+        if (!file || !file.name.endsWith('.csv')) {
+            alert('Please select a CSV file.');
+            return;
+        }
+        bulkFile = file;
+        document.getElementById('bulk-drop-zone').classList.add('hidden');
+        document.getElementById('bulk-file-info').classList.remove('hidden');
+        document.getElementById('bulk-filename').textContent = file.name;
+        document.getElementById('bulk-start-btn').disabled = false;
+    }
+
+    function clearBulkFile() {
+        bulkFile = null;
+        document.getElementById('bulk-drop-zone').classList.remove('hidden');
+        document.getElementById('bulk-file-info').classList.add('hidden');
+        document.getElementById('bulk-start-btn').disabled = true;
+    }
+
+    async function startBulkSearch() {
+        if (!bulkFile) return;
+
+        const formData = new FormData();
+        formData.append('file', bulkFile);
+
+        document.getElementById('bulk-start-btn').textContent = 'Uploading...';
+        document.getElementById('bulk-start-btn').disabled = true;
+
+        try {
+            const resp = await fetch('/api/bulk/upload', { method: 'POST', body: formData });
+            const data = await resp.json();
+
+            if (data.error) {
+                alert('Error: ' + data.error);
+                document.getElementById('bulk-start-btn').textContent = 'Start Bulk Search';
+                document.getElementById('bulk-start-btn').disabled = false;
+                return;
+            }
+
+            // Close dialog and show job status
+            document.querySelector('.fixed')?.remove();
+            showBulkJobStatus(data.job_id, data.total);
+        } catch (e) {
+            alert('Upload failed: ' + e.message);
+            document.getElementById('bulk-start-btn').textContent = 'Start Bulk Search';
+            document.getElementById('bulk-start-btn').disabled = false;
+        }
+    }
+
+    function showBulkJobStatus(jobId, total) {
+        const section = document.getElementById('results-section');
+        section.innerHTML = `
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 rounded-full bg-blue-900/30 flex items-center justify-center">
+                    <svg class="animate-spin w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-lg font-semibold">Bulk Search Running</h2>
+                    <p class="text-sm text-slate-400">Processing ${total} people...</p>
+                </div>
+            </div>
+            <div class="bg-slate-800 rounded-full h-3 overflow-hidden">
+                <div id="bulk-progress-bar" class="bg-blue-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between text-sm text-slate-400">
+                <span id="bulk-progress-text">0 / ${total}</span>
+                <span id="bulk-progress-pct">0%</span>
+            </div>
+            <div id="bulk-results-list" class="space-y-2 max-h-64 overflow-y-auto"></div>
+        </div>`;
+
+        // Poll for status
+        const pollInterval = setInterval(async () => {
+            try {
+                const resp = await fetch(`/api/bulk/status/${jobId}`);
+                const status = await resp.json();
+
+                const pct = Math.round((status.progress / total) * 100);
+                document.getElementById('bulk-progress-bar').style.width = pct + '%';
+                document.getElementById('bulk-progress-text').textContent = `${status.progress} / ${total}`;
+                document.getElementById('bulk-progress-pct').textContent = pct + '%';
+
+                if (status.status === 'completed') {
+                    clearInterval(pollInterval);
+                    document.getElementById('bulk-progress-bar').style.width = '100%';
+                    document.getElementById('bulk-progress-bar').classList.remove('bg-blue-500');
+                    document.getElementById('bulk-progress-bar').classList.add('bg-green-500');
+                }
+            } catch (e) {
+                console.error('Bulk poll error:', e);
+            }
+        }, 3000);
+    }
 
     // =====================================================================
     // Compare View
