@@ -117,7 +117,39 @@ python -m app.main search "Max Mustermann" --format pdf
 ---
 
 ## Status
-✅ **Functional** — Core pipeline complete, 100 tests passing.
+✅ **Production Ready** — Feature-rich webapp, 169 tests passing.
+
+### Web App Features (v0.4.0)
+- 🔍 Search with photo upload + auto-complete suggestions
+- 📊 Dashboard (stats, scanners, platforms, bulk jobs)
+- 📋 Results: Social, Web, Images, Professional, Emails, Timeline
+- ⚖️ Compare View (side-by-side dossier comparison)
+- 📁 Bulk Upload (CSV, real-time progress tracking)
+- 📥 Exports: JSON, HTML Report, Markdown, CSV History, All Dossiers
+- 🔍 Filters: Confidence, Platform, Verified, Bio, Min Similarity
+- 📈 Analytics Modal (confidence score, platform breakdown)
+- 🌓 Dark/Light Theme with persistence
+- ⚡ 11 Scanner Status cards
+- 🕐 Dossier Timeline (chronological view)
+- 📥 Search History export (JSON/CSV)
+
+### API Endpoints (v2)
+- `GET /api/v2/dossier/{id}/filter` — Filter results
+- `GET /api/v2/dossier/{id}/analytics` — Statistics
+- `GET /api/v2/dossier/{id}/platforms` — Platform list
+- `GET /api/v2/search/compare?id1=X&id2=Y` — Compare dossiers
+- `GET /api/v2/platforms/summary` — Global stats
+- `POST /api/bulk/upload` — CSV bulk search
+- `GET /api/timeline/{id}` — Chronological timeline
+- `GET /api/scanners/status` — Scanner health check
+- `GET /api/suggest/names?q=` — Name auto-complete
+- `GET /api/suggest/locations?q=` — Location suggestions
+- `GET /api/dossiers/export-all` — Export all dossiers
+
+### Analysis Modules
+- Smart Deduplication (URL/Username/Email)
+- Location Intelligence (50+ cities: DE/AT/CH/US/UK)
+- Confidence Scoring (source reliability + match quality)
 
 ### Implemented
 - [x] Pydantic Models (Person, SearchResult, SocialProfile, ImageMatch, Dossier)
