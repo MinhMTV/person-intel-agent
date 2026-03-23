@@ -1534,6 +1534,18 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
         }
     }
 
+    async function showRiskScore(id) {
+        try {
+            const resp = await fetch(`/api/dossier/${id}/risk`);
+            const data = await resp.json();
+            if (!data.risk) { showToast('No risk data available', 'warning'); return; }
+            const r = data.risk;
+            const levelColor = { low: 'text-green-400', moderate: 'text-amber-400', high: 'text-orange-400', critical: 'text-red-400' }[r.level] || 'text-slate-400';
+            const recommendations = (r.recommendations || []).map(rec => `<li class="flex items-start gap-2"><span class="text-blue-400 mt-0.5">•</span><span>${escHtml(rec)}</span></li>`).join('');
+            showToast(`🛡️ Risk: ${r.score}/100 (${r.level})`, r.level === 'critical' ? 'error' : r.level === 'high' ? 'warning' : 'info', 5000);
+        } catch (e) { showToast('Failed to load risk score', 'error'); }
+    }
+
     async function createShareLink(id) {
         try {
             const resp = await fetch(`/api/dossier/${id}/share`);
