@@ -258,6 +258,7 @@
                     <button onclick="copyHistoryJson()" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">📋 Copy</button>
                     <a href="/api/dossiers/export-all?fmt=json" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">📦 Export All</a>
                     <button onclick="copyAllDossiers()" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">📋 Copy All</button>
+                    <button onclick="copyAllDossiersCsv()" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">📊 Copy CSV</button>
                     <button onclick="showBulkUpload()" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">📁 Bulk Upload</button>
                     <button onclick="showSessionsModal()" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">🔑 Logins</button>
                     <button onclick="showCompareDialog()" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">⚖️ Compare</button>
@@ -908,6 +909,15 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
         } catch (e) {
             showNotification('Copy failed: ' + e.message, 'error');
         }
+    }
+
+    async function copyAllDossiersCsv() {
+        try {
+            const resp = await fetch('/api/dossiers/export-all?fmt=csv');
+            const text = await resp.text();
+            await navigator.clipboard.writeText(text);
+            showToast(`📋 All dossiers CSV copied to clipboard`, 'success', 3000);
+        } catch (e) { showToast('Copy failed: ' + e.message, 'error'); }
     }
 
     async function copyAllDossiers() {
