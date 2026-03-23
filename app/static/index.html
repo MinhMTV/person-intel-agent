@@ -919,6 +919,15 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
         }
     }
 
+    async function copyAllWeb() {
+        const d = await fetch(`/api/dossier/${currentDossierId}`).then(r => r.json()).then(j => j.dossier);
+        const results = d?.web_results || [];
+        if (!results.length) { showToast('No web results found', 'warning'); return; }
+        const text = results.map(r => `${r.title}\n${r.url}\n`).join('\n');
+        await navigator.clipboard.writeText(text);
+        showToast(`📋 ${results.length} web results copied`, 'success', 3000);
+    }
+
     async function copyAllSocial() {
         const d = await fetch(`/api/dossier/${currentDossierId}`).then(r => r.json()).then(j => j.dossier);
         const profiles = d?.social_profiles || [];
@@ -1149,6 +1158,7 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                 <button onclick="switchTab('social')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-blue-500 text-blue-400" data-tab="social">Social (${d.social_profiles?.length || 0})</button>
                 ${d.social_profiles?.length ? `<button onclick="copyAllSocial()" class="text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 transition" title="Copy all social profiles">📋 All</button>` : ''}
                 <button onclick="switchTab('web')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-300" data-tab="web">Web (${d.web_results?.length || 0})</button>
+                ${d.web_results?.length ? `<button onclick="copyAllWeb()" class="text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 transition" title="Copy all web results">📋 All</button>` : ''}
                 <button onclick="switchTab('images')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-300" data-tab="images">Images (${d.image_matches?.length || 0})</button>
                 <button onclick="switchTab('professional')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-300" data-tab="professional">Professional</button>
                 <button onclick="switchTab('emails')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-300" data-tab="emails">Emails (${d.email_addresses?.length || 0})</button>
