@@ -43,8 +43,30 @@
     </header>
 
     <main class="max-w-6xl mx-auto px-4 py-8">
+        <!-- Dashboard -->
+        <section id="dashboard" class="mb-8">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
+                    <div class="text-2xl font-bold text-blue-400" id="dash-searches">-</div>
+                    <div class="text-xs text-slate-500">Total Searches</div>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
+                    <div class="text-2xl font-bold text-green-400" id="dash-scanners">-</div>
+                    <div class="text-xs text-slate-500">Scanners Available</div>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
+                    <div class="text-2xl font-bold text-purple-400" id="dash-platforms">-</div>
+                    <div class="text-xs text-slate-500">Platforms Tracked</div>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
+                    <div class="text-2xl font-bold text-amber-400" id="dash-bulk">-</div>
+                    <div class="text-xs text-slate-500">Bulk Jobs</div>
+                </div>
+            </div>
+        </section>
+
         <!-- Search Form -->
-        <section class="mb-8">
+        <section class="mb-8" id="search-section">
             <h2 class="text-lg font-semibold mb-4 text-slate-300">New Search</h2>
             <form id="searchForm"
                   hx-post="/api/search"
@@ -348,6 +370,30 @@
 
     // Load history on page load
     loadHistory();
+    loadDashboard();
+
+    async function loadDashboard() {
+        try {
+            const [historyResp, scannersResp, platformsResp, bulkResp] = await Promise.all([
+                fetch('/api/history?limit=50'),
+                fetch('/api/scanners/status'),
+                fetch('/api/v2/platforms/summary'),
+                fetch('/api/bulk/jobs'),
+            ]);
+
+            const history = await historyResp.json();
+            const scanners = await scannersResp.json();
+            const platforms = await platformsResp.json();
+            const bulk = await bulkResp.json();
+
+            document.getElementById('dash-searches').textContent = history.history?.length || 0;
+            document.getElementById('dash-scanners').textContent = scanners.available || 0;
+            document.getElementById('dash-platforms').textContent = Object.keys(platforms.platforms || {}).length;
+            document.getElementById('dash-bulk').textContent = bulk.jobs?.length || 0;
+        } catch (e) {
+            console.error('Dashboard load error:', e);
+        }
+    }
 
     // =====================================================================
     // Bulk Search Upload
