@@ -1225,21 +1225,25 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                 </div>
                 <div class="flex gap-2">
                     <button onclick="showAnalytics('${data.id}')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📊 Analytics</button>
-                    <a href="/api/dossier/${data.id}/download?fmt=json"
-                       class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">⬇ JSON</a>
-                    <a href="/api/dossier/${data.id}/download?fmt=html"
-                       class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">⬇ HTML</a>
-                    <a href="/api/dossier/${data.id}/download?fmt=markdown"
-                       class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">⬇ Markdown</a>
-                    <button onclick="copyDossierMarkdown('${data.id}')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📋 Copy</button>
-                    <button onclick="copyDossierCsv()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📊 CSV</button>
-                    <button onclick="copyAllUrls()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">🔗 All URLs</button>
-                    <button onclick="copyDossierSummary()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📝 Summary</button>
-                    <button onclick="copyDossierJson()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">{ } JSON</button>
-                    <button onclick="copyDossierTable()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📊 Table</button>
-                    <button onclick="copyDossierHtml()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">🌐 HTML</button>
-                    <button onclick="copyDossierPdf()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📄 PDF</button>
-                    <button onclick="copyDossierZip()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📦 ZIP</button>
+                    <div class="relative" id="export-menu">
+                        <button onclick="document.getElementById('export-dropdown').classList.toggle('hidden')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📤 Export ▾</button>
+                        <div id="export-dropdown" class="hidden absolute right-0 mt-1 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 py-1">
+                            <a href="/api/dossier/${data.id}/download?fmt=json" class="block px-3 py-1.5 text-sm hover:bg-slate-700 transition">⬇ JSON</a>
+                            <a href="/api/dossier/${data.id}/download?fmt=html" class="block px-3 py-1.5 text-sm hover:bg-slate-700 transition">⬇ HTML</a>
+                            <a href="/api/dossier/${data.id}/download?fmt=markdown" class="block px-3 py-1.5 text-sm hover:bg-slate-700 transition">⬇ Markdown</a>
+                            <a href="/api/dossier/${data.id}/download?fmt=pdf" class="block px-3 py-1.5 text-sm hover:bg-slate-700 transition">⬇ PDF</a>
+                            <a href="/api/dossier/${data.id}/download/zip" class="block px-3 py-1.5 text-sm hover:bg-slate-700 transition">⬇ ZIP</a>
+                            <div class="border-t border-slate-700 my-1"></div>
+                            <button onclick="copyDossierMarkdown('${data.id}')" class="w-full text-left px-3 py-1.5 text-sm hover:bg-slate-700 transition">📋 Copy MD</button>
+                            <button onclick="copyDossierCsv()" class="w-full text-left px-3 py-1.5 text-sm hover:bg-slate-700 transition">📊 Copy CSV</button>
+                            <button onclick="copyDossierJson()" class="w-full text-left px-3 py-1.5 text-sm hover:bg-slate-700 transition">{ } Copy JSON</button>
+                            <button onclick="copyDossierHtml()" class="w-full text-left px-3 py-1.5 text-sm hover:bg-slate-700 transition">🌐 Copy HTML</button>
+                            <button onclick="copyDossierTable()" class="w-full text-left px-3 py-1.5 text-sm hover:bg-slate-700 transition">📊 Copy Table</button>
+                            <div class="border-t border-slate-700 my-1"></div>
+                            <button onclick="copyAllUrls()" class="w-full text-left px-3 py-1.5 text-sm hover:bg-slate-700 transition">🔗 All URLs</button>
+                            <button onclick="copyDossierSummary()" class="w-full text-left px-3 py-1.5 text-sm hover:bg-slate-700 transition">📝 Summary</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
