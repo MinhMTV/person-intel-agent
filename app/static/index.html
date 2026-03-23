@@ -918,12 +918,14 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
         const section = document.getElementById('results-section');
         const d = data.dossier;
         currentDossierId = data.id;
+        loadDossierNotes(data.id);
 
         let tabsHtml = `
         <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
             <!-- Summary bar -->
             <div class="px-6 py-4 border-b border-slate-800 flex flex-wrap items-center gap-4">
                 <h2 class="text-lg font-semibold flex-1">Dossier: ${escHtml(d.query.full_name)}</h2>
+                <div id="dossier-notes-display" class="w-full"></div>
                 <div class="flex gap-3 text-sm">
                     <span class="px-2 py-1 rounded bg-blue-900/50 text-blue-300">${data.results.social_profiles} Social</span>
                     <span class="px-2 py-1 rounded bg-green-900/50 text-green-300">${data.results.web_results} Web</span>
@@ -1280,6 +1282,20 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
     function renderActivityPlaceholder() {
         loadActivity();
         return '<div class="text-center py-8 text-slate-500"><span class="pulse-dot">●</span> Loading activity...</div>';
+    }
+
+    async function loadDossierNotes(id) {
+        try {
+            const resp = await fetch(`/api/history?limit=50`);
+            const data = await resp.json();
+            const entry = data.history?.find(h => h.id === id);
+            const container = document.getElementById('dossier-notes-display');
+            if (entry?.notes) {
+                container.innerHTML = `<div class="text-sm text-slate-400 italic">📝 "${escHtml(entry.notes)}"</div>`;
+            } else if (entry?.tags?.length) {
+                container.innerHTML = `<div class="flex gap-1">${entry.tags.map(t => `<span class="text-xs px-1.5 py-0.5 rounded bg-indigo-900/50 text-indigo-300">${escHtml(t)}</span>`).join('')}</div>`;
+            }
+        } catch (e) {}
     }
 
     async function loadActivity() {
