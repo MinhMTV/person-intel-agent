@@ -596,13 +596,15 @@ async def api_export_all(fmt: str = "json"):
         import io
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["ID", "Name", "Confidence", "Social Profiles", "Web Results", "Image Matches", "Emails", "Professional", "Scanners"])
+        writer.writerow(["ID", "Name", "Confidence", "Social Profiles", "Web Results", "Image Matches", "Emails", "Professional", "Scanners", "Notes", "Tags"])
         for did, d in _dossiers.items():
+            notes = _dossier_notes.get(did, "")
+            tags = ", ".join(_dossier_tags.get(did, []))
             writer.writerow([
                 did, d.query.full_name, f"{d.confidence_score:.2%}",
                 len(d.social_profiles), len(d.web_results), len(d.image_matches),
                 len(d.email_addresses), len(d.professional),
-                ", ".join(d.scanners_used),
+                ", ".join(d.scanners_used), notes, tags,
             ])
         return HTMLResponse(
             content=output.getvalue(),
