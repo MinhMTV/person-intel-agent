@@ -64,6 +64,12 @@
     <main class="max-w-6xl mx-auto px-4 py-8">
         <!-- Dashboard -->
         <section id="dashboard" class="mb-8">
+            <div class="flex items-center gap-4 mb-6">
+                <div class="flex-1 relative">
+                    <input type="text" id="globalDossierSearch" placeholder="🔍 Search across all dossiers..." oninput="globalSearchDossiers()" onfocus="globalSearchDossiers()" class="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-blue-500 transition placeholder-slate-500">
+                    <div id="globalSearchResults" class="absolute top-full left-0 right-0 mt-1 bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-xl z-40 hidden max-h-64 overflow-y-auto"></div>
+                </div>
+            </div>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
                     <div class="text-2xl font-bold text-blue-400" id="dash-searches">-</div>
@@ -469,6 +475,41 @@
             el.style.display = text.includes(q) ? '' : 'none';
         });
     }
+
+    let globalSearchTimeout = null;
+    function globalSearchDossiers() {
+        clearTimeout(globalSearchTimeout);
+        globalSearchTimeout = setTimeout(async () => {
+            const q = document.getElementById('globalDossierSearch').value.trim();
+            const container = document.getElementById('globalSearchResults');
+            if (q.length < 2) { container.classList.add('hidden'); return; }
+            try {
+                const resp = await fetch(`/api/dossiers/search?q=${encodeURIComponent(q)}`);
+                const data = await resp.json();
+                if (!data.results?.length) {
+                    container.innerHTML = '<div class="p-3 text-sm text-slate-500">No results found.</div>';
+                } else {
+                    container.innerHTML = data.results.map(r => `
+                        <div onclick="loadDossier('${r.dossier_id}'); document.getElementById('globalSearchResults').classList.add('hidden')" class="p-3 hover:bg-slate-800 cursor-pointer border-b border-slate-800 last:border-0">
+                            <div class="flex items-center justify-between">
+                                <span class="font-medium text-slate-200">${escHtml(r.name)}</span>
+                                <span class="text-xs text-green-400">${(r.confidence * 100).toFixed(0)}%</span>
+                            </div>
+                            <div class="text-xs text-slate-500 mt-1">${r.matches.length} match(es): ${r.matches.map(m => m.type).join(', ')}</div>
+                        </div>
+                    `).join('');
+                }
+                container.classList.remove('hidden');
+            } catch (e) { console.error('Global search error:', e); }
+        }, 300);
+    }
+
+    // Close dropdown on outside click
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#globalDossierSearch') && !e.target.closest('#globalSearchResults')) {
+            document.getElementById('globalSearchResults')?.classList.add('hidden');
+        }
+    });
 
     async function loadDossier(id) {
         try {
