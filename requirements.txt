@@ -33,3 +33,5 @@ python-dotenv>=1.0
 tldextract>=5.0
 dnspython>=2.4
 beautifulsoup4>=4.12
+python-whois>=0.9
+instaloader>=4.14
