@@ -35,6 +35,7 @@ from app.models import (
 
 # Import filter router
 from app.api_filters import router as filter_router
+from app.api_bulk import router as bulk_router
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -53,8 +54,9 @@ app = FastAPI(
     version="0.3.0",
 )
 
-# Include filter router
+# Include routers
 app.include_router(filter_router)
+app.include_router(bulk_router)
 
 # Serve static assets
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
