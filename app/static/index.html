@@ -159,6 +159,17 @@
                 <p>Enter a name above and click <strong>Run Search</strong> to generate a dossier.</p>
             </div>
         </section>
+
+        <!-- Search History -->
+        <section id="history-section" class="mt-8">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold text-slate-300">Search History</h2>
+                <button onclick="loadHistory()" class="text-sm text-slate-500 hover:text-slate-300 transition">↻ Refresh</button>
+            </div>
+            <div id="history-list" class="space-y-2">
+                <p class="text-sm text-slate-600">Loading...</p>
+            </div>
+        </section>
     </main>
 
     <!-- Footer -->
@@ -263,12 +274,81 @@
         if (evt.detail.pathInfo.requestPath === '/api/search' && evt.detail.successful) {
             const data = JSON.parse(evt.detail.xhr.responseText);
             renderResults(data);
+            loadHistory(); // Refresh history after new search
         }
     });
+
+    // =====================================================================
+    // Search History
+    // =====================================================================
+    let currentDossierId = null;
+
+    async function loadHistory() {
+        try {
+            const resp = await fetch('/api/history?limit=20');
+            const data = await resp.json();
+            const container = document.getElementById('history-list');
+
+            if (!data.history || !data.history.length) {
+                container.innerHTML = '<p class="text-sm text-slate-600">No searches yet.</p>';
+                return;
+            }
+
+            container.innerHTML = data.history.map(h => `
+                <div class="flex items-center gap-4 p-3 bg-slate-900 border border-slate-800 rounded-xl hover:border-slate-700 transition cursor-pointer"
+                     onclick="loadDossier('${h.id}')">
+                    <div class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-sm font-bold">
+                        ${escHtml(h.name?.[0] || '?')}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="font-medium text-slate-200">${escHtml(h.name)}</div>
+                        <div class="text-xs text-slate-500">${formatTime(h.timestamp)}</div>
+                    </div>
+                    <div class="flex gap-2 text-xs">
+                        ${h.results?.social_profiles ? `<span class="px-2 py-0.5 rounded bg-blue-900/50 text-blue-300">${h.results.social_profiles} social</span>` : ''}
+                        ${h.results?.web_results ? `<span class="px-2 py-0.5 rounded bg-green-900/50 text-green-300">${h.results.web_results} web</span>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        } catch (e) {
+            console.error('Failed to load history:', e);
+        }
+    }
+
+    async function loadDossier(id) {
+        try {
+            currentDossierId = id;
+            const resp = await fetch(`/api/dossier/${id}`);
+            const dossier = await resp.json();
+            renderResults({ id, dossier, results: {
+                social_profiles: dossier.social_profiles?.length || 0,
+                web_results: dossier.web_results?.length || 0,
+                image_matches: dossier.image_matches?.length || 0,
+                email_addresses: dossier.email_addresses?.length || 0,
+            }});
+        } catch (e) {
+            console.error('Failed to load dossier:', e);
+        }
+    }
+
+    function formatTime(ts) {
+        if (!ts) return '';
+        const d = new Date(ts);
+        const now = new Date();
+        const diff = (now - d) / 1000;
+        if (diff < 60) return 'just now';
+        if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+        if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+        return d.toLocaleDateString();
+    }
+
+    // Load history on page load
+    loadHistory();
 
     function renderResults(data) {
         const section = document.getElementById('results-section');
         const d = data.dossier;
+        currentDossierId = data.id;
 
         let tabsHtml = `
         <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
@@ -280,8 +360,10 @@
                     <span class="px-2 py-1 rounded bg-green-900/50 text-green-300">${data.results.web_results} Web</span>
                     <span class="px-2 py-1 rounded bg-purple-900/50 text-purple-300">${data.results.image_matches} Images</span>
                     <span class="px-2 py-1 rounded bg-amber-900/50 text-amber-300">${data.results.email_addresses} Emails</span>
+                    ${d.confidence_score ? `<span class="px-2 py-1 rounded bg-slate-700 text-slate-300">Confidence: ${(d.confidence_score * 100).toFixed(0)}%</span>` : ''}
                 </div>
                 <div class="flex gap-2">
+                    <button onclick="showAnalytics('${data.id}')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📊 Analytics</button>
                     <a href="/api/dossier/${data.id}/download?fmt=json"
                        class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">⬇ JSON</a>
                     <a href="/api/dossier/${data.id}/download?fmt=markdown"
@@ -289,13 +371,39 @@
                 </div>
             </div>
 
+            <!-- Filter bar -->
+            <div class="px-6 py-3 border-b border-slate-800 bg-slate-900/50 flex flex-wrap gap-3 items-center">
+                <span class="text-xs text-slate-500 font-medium">Filter:</span>
+                <select id="filter-confidence" onchange="applyFilters()" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300">
+                    <option value="">All Confidence</option>
+                    <option value="high">🟢 High</option>
+                    <option value="medium">🟡 Medium</option>
+                    <option value="low">🔴 Low</option>
+                </select>
+                <select id="filter-platform" onchange="applyFilters()" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300">
+                    <option value="">All Platforms</option>
+                    ${getPlatformOptions(d.social_profiles)}
+                </select>
+                <label class="flex items-center gap-2 text-sm text-slate-400 cursor-pointer">
+                    <input type="checkbox" id="filter-verified" onchange="applyFilters()" class="rounded bg-slate-800 border-slate-700">
+                    Verified only
+                </label>
+                <label class="flex items-center gap-2 text-sm text-slate-400 cursor-pointer">
+                    <input type="checkbox" id="filter-bio" onchange="applyFilters()" class="rounded bg-slate-800 border-slate-700">
+                    Has bio
+                </label>
+                <input type="number" id="filter-min-sim" onchange="applyFilters()" placeholder="Min similarity %" min="0" max="100"
+                    class="w-24 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300">
+                <button onclick="resetFilters()" class="text-xs text-slate-500 hover:text-slate-300 transition">Reset</button>
+            </div>
+
             <!-- Tab buttons -->
             <div class="flex border-b border-slate-800" id="tab-bar">
-                <button onclick="switchTab('social')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-blue-500 text-blue-400" data-tab="social">Social</button>
-                <button onclick="switchTab('web')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-300" data-tab="web">Web</button>
-                <button onclick="switchTab('images')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-300" data-tab="images">Images</button>
+                <button onclick="switchTab('social')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-blue-500 text-blue-400" data-tab="social">Social (${d.social_profiles?.length || 0})</button>
+                <button onclick="switchTab('web')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-300" data-tab="web">Web (${d.web_results?.length || 0})</button>
+                <button onclick="switchTab('images')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-300" data-tab="images">Images (${d.image_matches?.length || 0})</button>
                 <button onclick="switchTab('professional')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-300" data-tab="professional">Professional</button>
-                <button onclick="switchTab('emails')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-300" data-tab="emails">Emails</button>
+                <button onclick="switchTab('emails')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-300" data-tab="emails">Emails (${d.email_addresses?.length || 0})</button>
             </div>
 
             <!-- Tab content -->
@@ -309,6 +417,114 @@
         </div>`;
 
         section.innerHTML = tabsHtml;
+    }
+
+    function getPlatformOptions(profiles) {
+        if (!profiles) return '';
+        const platforms = [...new Set(profiles.map(p => p.platform))].sort();
+        return platforms.map(p => `<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('');
+    }
+
+    async function applyFilters() {
+        if (!currentDossierId) return;
+        const confidence = document.getElementById('filter-confidence').value;
+        const platform = document.getElementById('filter-platform').value;
+        const verified = document.getElementById('filter-verified').checked;
+        const hasBio = document.getElementById('filter-bio').checked;
+        const minSim = document.getElementById('filter-min-sim').value;
+
+        const params = new URLSearchParams();
+        if (confidence) params.set('confidence', confidence);
+        if (platform) params.set('platform', platform);
+        if (verified) params.set('verified_only', 'true');
+        if (hasBio) params.set('has_bio', 'true');
+        if (minSim) params.set('min_similarity', (parseFloat(minSim) / 100).toString());
+
+        try {
+            const resp = await fetch(`/api/v2/dossier/${currentDossierId}/filter?${params}`);
+            const data = await resp.json();
+
+            // Re-render filtered results
+            document.getElementById('tab-social').innerHTML = renderSocialProfiles(data.results.social_profiles);
+            document.getElementById('tab-web').innerHTML = renderWebResults(data.results.web_results);
+            document.getElementById('tab-images').innerHTML = renderImageMatches(data.results.image_matches);
+            document.getElementById('tab-professional').innerHTML = renderProfessional(data.results.professional);
+            document.getElementById('tab-emails').innerHTML = renderEmails(data.results.email_addresses);
+        } catch (e) {
+            console.error('Filter error:', e);
+        }
+    }
+
+    function resetFilters() {
+        document.getElementById('filter-confidence').value = '';
+        document.getElementById('filter-platform').value = '';
+        document.getElementById('filter-verified').checked = false;
+        document.getElementById('filter-bio').checked = false;
+        document.getElementById('filter-min-sim').value = '';
+        if (currentDossierId) loadDossier(currentDossierId);
+    }
+
+    async function showAnalytics(id) {
+        try {
+            const resp = await fetch(`/api/v2/dossier/${id}/analytics`);
+            const a = await resp.json();
+
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+            modal.innerHTML = `
+                <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-lg font-semibold">📊 Analytics: ${escHtml(a.name)}</h3>
+                        <button onclick="this.closest('.fixed').remove()" class="text-slate-500 hover:text-white text-xl">&times;</button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-slate-800 rounded-xl p-4 text-center">
+                            <div class="text-2xl font-bold text-blue-400">${(a.confidence_score * 100).toFixed(0)}%</div>
+                            <div class="text-xs text-slate-500">Confidence</div>
+                        </div>
+                        <div class="bg-slate-800 rounded-xl p-4 text-center">
+                            <div class="text-2xl font-bold text-green-400">${a.totals.total_results}</div>
+                            <div class="text-xs text-slate-500">Total Results</div>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-medium text-slate-400 mb-2">Platforms</h4>
+                        <div class="flex flex-wrap gap-2">
+                            ${Object.entries(a.platforms || {}).map(([p, c]) =>
+                                `<span class="px-2 py-1 rounded bg-slate-800 text-sm">${p}: ${c}</span>`
+                            ).join('')}
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-medium text-slate-400 mb-2">Confidence Distribution</h4>
+                        <div class="flex gap-2">
+                            <span class="px-3 py-1 rounded bg-green-900/50 text-green-300 text-sm">🟢 High: ${a.confidence_distribution?.high || 0}</span>
+                            <span class="px-3 py-1 rounded bg-amber-900/50 text-amber-300 text-sm">🟡 Med: ${a.confidence_distribution?.medium || 0}</span>
+                            <span class="px-3 py-1 rounded bg-slate-700 text-slate-400 text-sm">🔴 Low: ${a.confidence_distribution?.low || 0}</span>
+                        </div>
+                    </div>
+                    ${a.best_image_match ? `
+                    <div>
+                        <h4 class="text-sm font-medium text-slate-400 mb-2">Best Image Match</h4>
+                        <div class="bg-slate-800 rounded-xl p-3 flex items-center gap-3">
+                            <div class="text-2xl font-bold ${a.best_image_match.similarity > 0.8 ? 'text-green-400' : 'text-amber-400'}">${(a.best_image_match.similarity * 100).toFixed(0)}%</div>
+                            <a href="${escHtml(a.best_image_match.source)}" target="_blank" class="text-blue-400 text-sm truncate">${escHtml(a.best_image_match.source)}</a>
+                        </div>
+                    </div>` : ''}
+                    <div>
+                        <h4 class="text-sm font-medium text-slate-400 mb-2">Scanners Used</h4>
+                        <div class="flex flex-wrap gap-1">
+                            ${(a.scanners_used || []).map(s => `<span class="px-2 py-0.5 rounded bg-slate-800 text-xs text-slate-400">${s}</span>`).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        } catch (e) {
+            console.error('Analytics error:', e);
+        }
     }
 
     function switchTab(name) {
