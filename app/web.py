@@ -323,6 +323,46 @@ async def api_cache_clear(body: dict = Body(default={})):
     return {"cleared": cleared}
 
 
+@app.get("/api/dossier/{dossier_id}/share")
+async def api_create_share_link(dossier_id: str):
+    """Create a shareable read-only link for a dossier."""
+    dossier = _dossiers.get(dossier_id)
+    if not dossier:
+        raise HTTPException(status_code=404, detail="Dossier not found")
+    import uuid
+    share_id = str(uuid.uuid4())[:8]
+    # Store share mapping
+    if not hasattr(api_create_share_link, "_shares"):
+        api_create_share_link._shares = {}
+    api_create_share_link._shares[share_id] = dossier_id
+    return {"share_id": share_id, "share_url": f"/share/{share_id}"}
+
+
+@app.get("/share/{share_id}")
+async def api_view_share(share_id: str):
+    """View a shared dossier (read-only)."""
+    if not hasattr(api_create_share_link, "_shares"):
+        raise HTTPException(status_code=404, detail="Share not found")
+    dossier_id = api_create_share_link._shares.get(share_id)
+    if not dossier_id:
+        raise HTTPException(status_code=404, detail="Share not found")
+    dossier = _dossiers.get(dossier_id)
+    if not dossier:
+        raise HTTPException(status_code=404, detail="Dossier not found")
+    return {
+        "dossier_id": dossier_id,
+        "name": dossier.query.full_name,
+        "confidence_score": dossier.confidence_score,
+        "social_profiles": len(dossier.social_profiles),
+        "web_results": len(dossier.web_results),
+        "image_matches": len(dossier.image_matches),
+        "email_addresses": len(dossier.email_addresses),
+        "professional": len(dossier.professional),
+        "scanners_used": dossier.scanners_used,
+        "summary": dossier.summary(),
+    }
+
+
 @app.get("/api/dossier/{dossier_id}/risk")
 async def api_dossier_risk(dossier_id: str):
     """Calculate risk score for a dossier."""
