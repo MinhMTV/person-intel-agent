@@ -577,7 +577,25 @@ async def api_export_all(fmt: str = "json"):
         return {"error": "No dossiers to export"}
     _log_activity("all", "export-all", fmt)
 
-    if fmt == "json":
+    if fmt == "csv":
+        import csv
+        import io
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["ID", "Name", "Confidence", "Social Profiles", "Web Results", "Image Matches", "Emails", "Professional", "Scanners"])
+        for did, d in _dossiers.items():
+            writer.writerow([
+                did, d.query.full_name, f"{d.confidence_score:.2%}",
+                len(d.social_profiles), len(d.web_results), len(d.image_matches),
+                len(d.email_addresses), len(d.professional),
+                ", ".join(d.scanners_used),
+            ])
+        return HTMLResponse(
+            content=output.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": 'attachment; filename="all_dossiers.csv"'},
+        )
+    elif fmt == "json":
         all_data = {}
         for did, d in _dossiers.items():
             all_data[did] = {
