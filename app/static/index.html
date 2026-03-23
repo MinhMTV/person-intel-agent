@@ -896,6 +896,17 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
     // =====================================================================
     let compareHistoryCache = [];
 
+    async function copyDossierMarkdown(id) {
+        try {
+            const resp = await fetch(`/api/dossier/${id}/download?fmt=markdown`);
+            const text = await resp.text();
+            await navigator.clipboard.writeText(text);
+            showNotification('Dossier copied to clipboard!', 'success');
+        } catch (e) {
+            showNotification('Copy failed: ' + e.message, 'error');
+        }
+    }
+
     function setCompareTarget(id) {
         // Open compare dialog with this dossier pre-selected
         showCompareDialog().then(() => {
@@ -1070,6 +1081,7 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                        class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">⬇ HTML</a>
                     <a href="/api/dossier/${data.id}/download?fmt=markdown"
                        class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">⬇ Markdown</a>
+                    <button onclick="copyDossierMarkdown('${data.id}')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📋 Copy</button>
                 </div>
             </div>
 
