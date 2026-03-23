@@ -908,6 +908,15 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
         }
     }
 
+    async function copyDossierPdf() {
+        try {
+            const resp = await fetch(`/api/dossier/${currentDossierId}/download?fmt=pdf`);
+            const blob = await resp.blob();
+            await navigator.clipboard.write([new ClipboardItem({ 'application/pdf': blob })]);
+            showToast('📋 Dossier PDF copied to clipboard', 'success', 3000);
+        } catch (e) { showToast('Copy failed: ' + e.message, 'error'); }
+    }
+
     async function copyDossierHtml() {
         try {
             const resp = await fetch(`/api/dossier/${currentDossierId}/download?fmt=html`);
@@ -1215,6 +1224,7 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                     <button onclick="copyDossierJson()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">{ } JSON</button>
                     <button onclick="copyDossierTable()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📊 Table</button>
                     <button onclick="copyDossierHtml()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">🌐 HTML</button>
+                    <button onclick="copyDossierPdf()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📄 PDF</button>
                 </div>
             </div>
 
