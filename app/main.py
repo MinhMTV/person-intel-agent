@@ -9,6 +9,7 @@ from rich.table import Table
 
 from app.models import PersonQuery, Location, PersonDossier, SearchResult, SocialProfile, ImageMatch, Source, Confidence
 from app.analysis.dedup import dedup_all
+from app.analysis.scoring import apply_confidence_scores
 from app.scanners.social import SocialScanner
 from app.scanners.web import WebScanner
 from app.scanners.image import ImageScanner
@@ -367,6 +368,15 @@ async def _run_scanners(query: PersonQuery, scanner_list: str) -> PersonDossier:
     dossier.email_addresses = deduped["email_addresses"]
     dossier.professional = deduped["professional"]
     dossier.academic = deduped["academic"]
+
+    # Apply confidence scores
+    scored = apply_confidence_scores(
+        social_profiles=dossier.social_profiles,
+        web_results=dossier.web_results,
+        image_matches=dossier.image_matches,
+        query=query,
+    )
+    dossier.confidence_score = scored["overall_confidence"]
 
     return dossier
 
