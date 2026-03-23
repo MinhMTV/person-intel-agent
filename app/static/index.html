@@ -919,6 +919,10 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                     <span class="px-2 py-1 rounded bg-green-900/50 text-green-300">${data.results.web_results} Web</span>
                     <span class="px-2 py-1 rounded bg-purple-900/50 text-purple-300">${data.results.image_matches} Images</span>
                     <span class="px-2 py-1 rounded bg-amber-900/50 text-amber-300">${data.results.email_addresses} Emails</span>
+                    <a href="/api/dossier/${data.id}/download?fmt=html" target="_blank" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Export HTML">📥 HTML</a>
+                    <a href="/api/dossier/${data.id}/download?fmt=markdown" target="_blank" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Export MD">📥 MD</a>
+                    <button onclick="pinSearch('${data.id}')" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Pin">📌 Pin</button>
+                    <button onclick="addTag('${data.id}')" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Tag">🏷️ Tag</button>
                     ${d.confidence_score ? `<span class="px-2 py-1 rounded bg-slate-700 text-slate-300">Confidence: ${(d.confidence_score * 100).toFixed(0)}%</span>` : ''}
                 </div>
                 <div class="flex gap-2">
