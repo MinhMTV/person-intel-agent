@@ -942,6 +942,7 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                 <div id="tab-professional" class="tab-content hidden">${renderProfessional(d.professional)}</div>
                 <div id="tab-emails" class="tab-content hidden">${renderEmails(d.email_addresses)}</div>
                 <div id="tab-timeline" class="tab-content hidden">${renderTimelinePlaceholder()}</div>
+                <div id="tab-activity" class="tab-content hidden">${renderActivityPlaceholder()}</div>
             </div>
         </div>`;
 
@@ -1221,6 +1222,44 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
         } catch (e) {
             console.error('Timeline load error:', e);
             document.getElementById('tab-timeline').innerHTML = emptyState('Failed to load timeline.');
+        }
+    }
+
+    // =====================================================================
+    // Activity Log
+    // =====================================================================
+    function renderActivityPlaceholder() {
+        loadActivity();
+        return '<div class="text-center py-8 text-slate-500"><span class="pulse-dot">●</span> Loading activity...</div>';
+    }
+
+    async function loadActivity() {
+        try {
+            const resp = await fetch('/api/activity');
+            const data = await resp.json();
+            const container = document.getElementById('tab-activity');
+            const actionIcons = {
+                search: '🔍', pin: '📌', tag: '🏷️', export: '📥', 'export-all': '📦',
+            };
+            const actionColors = {
+                search: 'text-blue-400', pin: 'text-amber-400', tag: 'text-purple-400',
+                'export-all': 'text-green-400',
+            };
+
+            container.innerHTML = `
+                <div class="space-y-2">
+                    ${data.activity.map(a => `
+                        <div class="flex items-center gap-3 p-2 bg-slate-900/50 rounded-lg">
+                            <span class="text-lg">${actionIcons[a.action] || '•'}</span>
+                            <span class="text-sm ${actionColors[a.action] || 'text-slate-400'} font-medium">${escHtml(a.action)}</span>
+                            <span class="text-sm text-slate-300 flex-1 truncate">${escHtml(a.detail)}</span>
+                            <span class="text-xs text-slate-500">${formatTime(a.timestamp)}</span>
+                        </div>
+                    `).join('')}
+                    ${!data.activity.length ? '<div class="text-center py-8 text-slate-500">No activity yet.</div>' : ''}
+                </div>`;
+        } catch (e) {
+            console.error('Activity load error:', e);
         }
     }
 

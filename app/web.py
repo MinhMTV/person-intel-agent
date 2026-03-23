@@ -70,6 +70,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 # In-memory dossier store (swap for Redis/DB in production)
 _dossiers: dict[str, PersonDossier] = {}
 _search_history: list[dict] = []  # Recent search history
+_activity_log: list[dict] = []  # Activity log (max 200)
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +157,7 @@ async def api_search(
     })
     # Keep only last 50 searches
     _search_history[:] = _search_history[:50]
+    _log_activity(dossier_id, "search", query.full_name)
 
     return {
         "id": dossier_id,
@@ -215,6 +217,7 @@ async def api_pin_search(dossier_id: str):
     for entry in _search_history:
         if entry.get("id") == dossier_id:
             entry["pinned"] = not entry.get("pinned", False)
+            _log_activity(dossier_id, "pin", "pinned" if entry["pinned"] else "unpinned")
             return {"id": dossier_id, "pinned": entry["pinned"]}
     raise HTTPException(status_code=404, detail="Search not found")
 
@@ -244,6 +247,7 @@ async def api_add_tag(dossier_id: str, body: dict = Body(...)):
             else:
                 tags.add(tag)
             entry["tags"] = sorted(tags)
+            _log_activity(dossier_id, "tag", f"{tag} {'removed' if tag not in tags else 'added'}")
             return {"id": dossier_id, "tags": entry["tags"]}
     raise HTTPException(status_code=404, detail="Search not found")
 
@@ -256,6 +260,26 @@ async def api_all_tags():
         for t in entry.get("tags", []):
             tag_counts[t] = tag_counts.get(t, 0) + 1
     return {"tags": tag_counts}
+
+
+def _log_activity(dossier_id: str, action: str, detail: str = ""):
+    """Log an activity event."""
+    import datetime
+    _activity_log.insert(0, {
+        "dossier_id": dossier_id,
+        "action": action,
+        "detail": detail,
+        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+    })
+    # Keep only last 200
+    if len(_activity_log) > 200:
+        _activity_log.pop()
+
+
+@app.get("/api/activity")
+async def api_activity(limit: int = 50):
+    """Get recent activity log."""
+    return {"activity": _activity_log[:limit]}
 
 
 @app.get("/api/history/export")
@@ -292,6 +316,7 @@ async def api_export_all(fmt: str = "json"):
 
     if not _dossiers:
         return {"error": "No dossiers to export"}
+    _log_activity("all", "export-all", fmt)
 
     if fmt == "json":
         all_data = {}
