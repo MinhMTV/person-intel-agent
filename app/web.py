@@ -309,6 +309,21 @@ async def api_cache_clear(body: dict = Body(default={})):
     return {"cleared": cleared}
 
 
+@app.get("/api/dossier/{dossier_id}/diff/{other_id}")
+async def api_dossier_diff(dossier_id: str, other_id: str):
+    """Compare two dossiers and show differences."""
+    d1 = _dossiers.get(dossier_id)
+    d2 = _dossiers.get(other_id)
+    if not d1 or not d2:
+        raise HTTPException(status_code=404, detail="Dossier not found")
+    from app.diff import diff_dossiers, diff_summary
+    diff = diff_dossiers(d1.model_dump(), d2.model_dump())
+    diff["summary"] = diff_summary(diff)
+    diff["dossier_a"] = {"id": dossier_id, "name": d1.query.full_name}
+    diff["dossier_b"] = {"id": other_id, "name": d2.query.full_name}
+    return diff
+
+
 @app.get("/api/schedules")
 async def api_list_schedules():
     """List all scheduled searches."""
