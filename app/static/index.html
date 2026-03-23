@@ -418,8 +418,11 @@
                 const totalResults = h.results ? (h.results.social_profiles + h.results.web_results + h.results.image_matches + h.results.email_addresses) : 0;
 
                 return `
-                <div class="flex items-center gap-4 p-3 bg-slate-900 border border-slate-800 rounded-xl hover:border-slate-700 transition cursor-pointer"
+                <div class="flex items-center gap-4 p-3 bg-slate-900 border ${h.pinned ? 'border-amber-500/50' : 'border-slate-800'} rounded-xl hover:border-slate-700 transition cursor-pointer"
                      onclick="loadDossier('${h.id}')">
+                    <button onclick="event.stopPropagation(); pinSearch('${h.id}')" class="text-lg ${h.pinned ? 'text-amber-400' : 'text-slate-600 hover:text-amber-400'} transition" title="Pin">
+                        ${h.pinned ? '📌' : '📍'}
+                    </button>
                     <div class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-sm font-bold">
                         ${escHtml(h.name?.[0] || '?')}
                     </div>
@@ -1211,6 +1214,17 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
     // Register service worker
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+    }
+
+    async function pinSearch(id) {
+        try {
+            const resp = await fetch(`/api/history/pin/${id}`, { method: 'POST' });
+            const data = await resp.json();
+            showToast(data.pinned ? 'Search pinned' : 'Search unpinned', 'info');
+            loadHistory();
+        } catch (e) {
+            showToast('Failed to pin search', 'error');
+        }
     }
 
     // =====================================================================

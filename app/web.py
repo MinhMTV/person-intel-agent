@@ -203,7 +203,20 @@ async def api_history(limit: int = 20):
                 best = max(dossier.social_profiles, key=lambda p: 1 if p.confidence.value == "high" else 0)
                 enriched_entry["top_platform"] = best.platform
         enriched.append(enriched_entry)
+
+    # Sort: pinned first
+    enriched.sort(key=lambda x: (0 if x.get("pinned") else 1), reverse=False)
     return {"history": enriched}
+
+
+@app.post("/api/history/pin/{dossier_id}")
+async def api_pin_search(dossier_id: str):
+    """Pin/unpin a search in history."""
+    for entry in _search_history:
+        if entry.get("id") == dossier_id:
+            entry["pinned"] = not entry.get("pinned", False)
+            return {"id": dossier_id, "pinned": entry["pinned"]}
+    raise HTTPException(status_code=404, detail="Search not found")
 
 
 @app.get("/api/history/export")
