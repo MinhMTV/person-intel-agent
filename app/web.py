@@ -307,6 +307,13 @@ async def api_rate_stats():
     return tracker.get_stats()
 
 
+@app.get("/api/templates")
+async def api_templates():
+    """Get all available search templates."""
+    from app.templates import get_templates
+    return {"templates": get_templates()}
+
+
 @app.post("/api/cache/clear")
 async def api_cache_clear(body: dict = Body(default={})):
     """Clear scanner cache."""
