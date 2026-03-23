@@ -101,6 +101,10 @@
                 <div id="timeline-bars" class="flex items-end gap-1 h-16"></div>
                 <div class="flex justify-between text-xs text-slate-600 mt-1"><span>00:00</span><span>12:00</span><span>now</span></div>
             </div>
+            <div id="recent-dossier" class="bg-slate-900 border border-slate-800 rounded-xl p-4 hidden">
+                <h3 class="text-sm font-medium text-slate-400 mb-3">Most Recent Dossier</h3>
+                <div id="recent-dossier-content"></div>
+            </div>
             <div id="platforms-chart" class="bg-slate-900 border border-slate-800 rounded-xl p-4 hidden">
                 <h3 class="text-sm font-medium text-slate-400 mb-3">Top Platforms</h3>
                 <div id="platform-bars" class="space-y-1.5"></div>
@@ -679,6 +683,26 @@
                 }).join('');
                 document.getElementById('platforms-chart').classList.remove('hidden');
             }
+
+            // Load recent dossier
+            try {
+                const histResp = await fetch('/api/history?limit=1');
+                const histData = await histResp.json();
+                if (histData.history?.length) {
+                    const h = histData.history[0];
+                    const confPct = h.confidence ? `${(h.confidence * 100).toFixed(0)}%` : 'N/A';
+                    document.getElementById('recent-dossier-content').innerHTML = `
+                        <div class="flex items-center gap-3 cursor-pointer" onclick="loadDossier('${h.id}')">
+                            <div class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-lg font-bold">${escHtml(h.name?.[0] || '?')}</div>
+                            <div class="flex-1">
+                                <div class="font-medium text-slate-200">${escHtml(h.name)}</div>
+                                <div class="text-xs text-slate-500">${formatTime(h.timestamp)}</div>
+                            </div>
+                            <span class="text-lg font-bold ${h.confidence > 0.7 ? 'text-green-400' : h.confidence > 0.4 ? 'text-amber-400' : 'text-slate-500'}">${confPct}</span>
+                        </div>`;
+                    document.getElementById('recent-dossier').classList.remove('hidden');
+                }
+            } catch (e) {}
         } catch (e) {
             console.error('Dashboard load error:', e);
         }
