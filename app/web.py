@@ -443,12 +443,15 @@ async def api_history_export(fmt: str = "json"):
 
     if fmt == "csv":
         output = io.StringIO()
-        writer = csv.DictWriter(output, fieldnames=["id", "name", "timestamp", "results"])
+        writer = csv.DictWriter(output, fieldnames=["id", "name", "timestamp", "results", "confidence", "notes", "tags"])
         writer.writeheader()
         for h in _search_history:
             row = dict(h)
             if "results" in row and isinstance(row["results"], dict):
                 row["results"] = "; ".join(f"{k}={v}" for k, v in row["results"].items())
+            row["notes"] = row.get("notes", "")
+            row["tags"] = ", ".join(row.get("tags", []))
+            row["confidence"] = f"{row.get('confidence', 0):.0%}" if row.get("confidence") else ""
             writer.writerow(row)
         return HTMLResponse(
             content=output.getvalue(),
