@@ -908,6 +908,15 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
         }
     }
 
+    async function copyDossierCsv() {
+        try {
+            const resp = await fetch(`/api/dossier/${currentDossierId}/download?fmt=csv`);
+            const text = await resp.text();
+            await navigator.clipboard.writeText(text);
+            showToast('📋 Dossier CSV copied to clipboard', 'success', 3000);
+        } catch (e) { showToast('Copy failed: ' + e.message, 'error'); }
+    }
+
     async function copyDossierMarkdown(id) {
         try {
             const resp = await fetch(`/api/dossier/${id}/download?fmt=markdown`);
@@ -1138,6 +1147,7 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                     <a href="/api/dossier/${data.id}/download?fmt=markdown"
                        class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">⬇ Markdown</a>
                     <button onclick="copyDossierMarkdown('${data.id}')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📋 Copy</button>
+                    <button onclick="copyDossierCsv()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📊 CSV</button>
                 </div>
             </div>
 
