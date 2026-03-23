@@ -524,6 +524,50 @@ async def api_dossier_search(q: str = "", limit: int = 20):
     return {"results": hits[:limit], "query": q, "total_hits": len(hits)}
 
 
+@app.get("/api/dossier/{dossier_id}/download/zip")
+async def api_dossier_zip(dossier_id: str):
+    """Download dossier as ZIP (JSON + HTML + PDF + MD)."""
+    import io
+    import zipfile
+
+    dossier = _dossiers.get(dossier_id)
+    if not dossier:
+        raise HTTPException(status_code=404, detail="Dossier not found")
+
+    filename = dossier.query.full_name.replace(" ", "_")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        # JSON
+        zf.writestr(f"{filename}_dossier.json", json.dumps(json.loads(dossier.model_dump_json()), indent=2))
+
+        # HTML
+        try:
+            from app.report_html import generate_html_report
+            html = generate_html_report(dossier, dossier_id)
+            zf.writestr(f"{filename}_dossier.html", html)
+        except Exception:
+            pass
+
+        # PDF
+        try:
+            from app.report_pdf import generate_pdf
+            pdf_bytes = generate_pdf(dossier)
+            zf.writestr(f"{filename}_dossier.pdf", pdf_bytes)
+        except Exception:
+            pass
+
+        # Markdown summary
+        zf.writestr(f"{filename}_summary.md", dossier.summary())
+
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}_dossier.zip"'},
+    )
+
+
 @app.get("/api/dossiers/export-all")
 async def api_export_all(fmt: str = "json"):
     """Export all dossiers as a single JSON or concatenated Markdown."""
