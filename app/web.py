@@ -280,6 +280,17 @@ async def api_all_tags():
     return {"tags": tag_counts}
 
 
+@app.get("/api/history/by-tag/{tag}")
+async def api_history_by_tag(tag: str, limit: int = 20):
+    """Get search history entries with a specific tag."""
+    tag_lower = tag.lower().strip()
+    results = []
+    for entry in _search_history:
+        if tag_lower in [t.lower() for t in entry.get("tags", [])]:
+            results.append(entry)
+    return {"tag": tag, "results": results[:limit]}
+
+
 def _log_activity(dossier_id: str, action: str, detail: str = ""):
     """Log an activity event."""
     import datetime
