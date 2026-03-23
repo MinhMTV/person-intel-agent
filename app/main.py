@@ -34,7 +34,8 @@ def search(
     photo: str = typer.Option(None, "--photo", "-p", help="Path to photo for image search"),
     nicknames: list[str] = typer.Option([], "--nick", "-n", help="Nicknames"),
     scanners: str = typer.Option("social,web,email,image,advanced_image,reverse_image", "--scanners", "-s", help="Comma-separated scanners"),
-    output_format: str = typer.Option("markdown", "--format", "-f", help="Output format: markdown, pdf, json"),
+    output_format: str = typer.Option("markdown", "--format", "-f", help="Output format: markdown, html, pdf, json, csv"),
+    multi_format: str = typer.Option(None, "--multi-format", "-mf", help="Comma-separated output formats (e.g., markdown,json,pdf)"),
 ):
     """Search for a person and generate an intelligence dossier."""
     # Build query
@@ -63,7 +64,7 @@ def search(
     _display_results(dossier)
 
     # Save output
-    _save_output(dossier, output_format)
+    _save_output(dossier, output_format, multi_format)
 
 
 @app.command()
@@ -318,23 +319,23 @@ def _display_results(dossier: PersonDossier):
             console.print(f"    Image: {m.image_url[:60]}")
 
 
-def _save_output(dossier: PersonDossier, fmt: str):
-    """Save dossier to file."""
-    from pathlib import Path
+def _save_output(dossier: PersonDossier, fmt: str, multi_format: str = None):
+    """Save dossier to file(s) using ReportGenerator."""
+    from app.report_generator import ReportGenerator
 
-    output_dir = Path("output")
-    output_dir.mkdir(exist_ok=True)
+    generator = ReportGenerator()
 
-    filename = dossier.query.full_name.replace(" ", "_").lower()
-
-    if fmt == "json":
-        path = output_dir / f"{filename}.json"
-        path.write_text(dossier.model_dump_json(indent=2))
+    if multi_format:
+        formats = [f.strip() for f in multi_format.split(",")]
     else:
-        path = output_dir / f"{filename}.md"
-        path.write_text(dossier.summary())
+        formats = [fmt]
 
-    console.print(f"\n📄 Saved to: [bold]{path}[/bold]")
+    outputs = generator.generate(dossier, formats)
+
+    from rich.console import Console
+    console = Console()
+    for format_name, path in outputs.items():
+        console.print(f"📄 [{format_name}] Saved to: [bold]{path}[/bold]")
 
 
 if __name__ == "__main__":
