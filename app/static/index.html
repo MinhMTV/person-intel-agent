@@ -81,6 +81,14 @@
                     <div class="text-2xl font-bold text-amber-400" id="dash-bulk">-</div>
                     <div class="text-xs text-slate-500">Bulk Jobs</div>
                 </div>
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
+                    <div class="text-2xl font-bold text-rose-400" id="dash-dossiers">-</div>
+                    <div class="text-xs text-slate-500">Dossiers</div>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
+                    <div class="text-2xl font-bold text-cyan-400" id="dash-conf">-</div>
+                    <div class="text-xs text-slate-500">Avg Confidence</div>
+                </div>
             </div>
             <div id="search-timeline" class="bg-slate-900 border border-slate-800 rounded-xl p-4 hidden">
                 <h3 class="text-sm font-medium text-slate-400 mb-3">Search Activity (last 24h)</h3>
@@ -534,6 +542,8 @@
             document.getElementById('dash-scanners').textContent = scanners.available || 0;
             document.getElementById('dash-platforms').textContent = Object.keys(platforms.platforms || {}).length;
             document.getElementById('dash-bulk').textContent = bulk.jobs?.length || 0;
+            document.getElementById('dash-dossiers').textContent = statsData?.total || 0;
+            document.getElementById('dash-conf').textContent = statsData?.stats?.avg_confidence ? `${(statsData.stats.avg_confidence * 100).toFixed(0)}%` : '-';
 
             // Build search activity timeline
             if (history.history?.length) {
