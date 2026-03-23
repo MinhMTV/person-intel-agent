@@ -908,6 +908,20 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
         }
     }
 
+    async function copyDossierZip() {
+        try {
+            const resp = await fetch(`/api/dossier/${currentDossierId}/download/zip`);
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `dossier_${currentDossierId}.zip`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('📦 Dossier ZIP downloaded', 'success', 3000);
+        } catch (e) { showToast('Download failed: ' + e.message, 'error'); }
+    }
+
     async function copyDossierPdf() {
         try {
             const resp = await fetch(`/api/dossier/${currentDossierId}/download?fmt=pdf`);
@@ -1225,6 +1239,7 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                     <button onclick="copyDossierTable()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📊 Table</button>
                     <button onclick="copyDossierHtml()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">🌐 HTML</button>
                     <button onclick="copyDossierPdf()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📄 PDF</button>
+                    <button onclick="copyDossierZip()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📦 ZIP</button>
                 </div>
             </div>
 
