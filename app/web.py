@@ -309,6 +309,45 @@ async def api_cache_clear(body: dict = Body(default={})):
     return {"cleared": cleared}
 
 
+@app.get("/api/schedules")
+async def api_list_schedules():
+    """List all scheduled searches."""
+    from app.scheduled import get_schedules
+    return {"schedules": get_schedules()}
+
+
+@app.post("/api/schedules")
+async def api_add_schedule(body: dict = Body(...)):
+    """Add a scheduled search."""
+    from app.scheduled import add_schedule
+    name = body.get("name", "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Name required")
+    interval = body.get("interval_hours", 24)
+    sid = add_schedule(name, interval_hours=interval)
+    return {"id": sid, "name": name}
+
+
+@app.delete("/api/schedules/{sid}")
+async def api_delete_schedule(sid: str):
+    """Delete a scheduled search."""
+    from app.scheduled import remove_schedule
+    ok = remove_schedule(sid)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    return {"deleted": sid}
+
+
+@app.post("/api/schedules/{sid}/toggle")
+async def api_toggle_schedule(sid: str):
+    """Toggle a scheduled search on/off."""
+    from app.scheduled import toggle_schedule
+    enabled = toggle_schedule(sid)
+    if enabled is None:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    return {"id": sid, "enabled": enabled}
+
+
 @app.get("/api/history/export")
 async def api_history_export(fmt: str = "json"):
     """Export search history as JSON or CSV."""
