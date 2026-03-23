@@ -253,6 +253,7 @@
                     <a href="/api/history/export?fmt=json" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">📥 JSON</a>
                     <a href="/api/dossiers/export-all?fmt=json" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">📦 Export All</a>
                     <button onclick="showBulkUpload()" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">📁 Bulk Upload</button>
+                    <button onclick="showSessionsModal()" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">🔑 Logins</button>
                     <button onclick="showCompareDialog()" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">⚖️ Compare</button>
                     <button onclick="loadHistory()" class="text-sm text-slate-500 hover:text-slate-300 transition">↻ Refresh</button>
                 </div>
@@ -1503,6 +1504,123 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
             toast.classList.add('translate-x-full', 'opacity-0');
             setTimeout(() => toast.remove(), 300);
         }, duration);
+    }
+
+    // =====================================================================
+    // Sessions / Login Manager
+    // =====================================================================
+    async function showSessionsModal() {
+        const resp = await fetch('/api/sessions');
+        const data = await resp.json();
+        const sessions = data.sessions || {};
+
+        const platforms = [
+            { id: 'linkedin', name: 'LinkedIn', icon: '💼', color: 'text-blue-400' },
+            { id: 'xing', name: 'Xing', icon: '🔷', color: 'text-green-400' },
+            { id: 'instagram', name: 'Instagram', icon: '📷', color: 'text-pink-400' },
+        ];
+
+        let html = `<div class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)this.remove()">
+            <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold">🔑 Login Sessions</h2>
+                    <button onclick="this.closest('.fixed').remove()" class="text-slate-500 hover:text-white text-xl">&times;</button>
+                </div>`;
+
+        platforms.forEach(p => {
+            const s = sessions[p.id] || {};
+            const statusBadge = s.status === 'logged_in'
+                ? '<span class="text-xs px-2 py-0.5 rounded bg-green-900/50 text-green-300">✅ Logged In</span>'
+                : s.status === 'expired'
+                ? '<span class="text-xs px-2 py-0.5 rounded bg-amber-900/50 text-amber-300">⏰ Expired</span>'
+                : '<span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400">❌ Not Logged In</span>';
+
+            html += `
+            <div class="bg-slate-800 rounded-xl p-4 mb-3">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl">${p.icon}</span>
+                        <span class="font-medium ${p.color}">${p.name}</span>
+                    </div>
+                    ${statusBadge}
+                </div>
+                ${s.saved_at ? `<div class="text-xs text-slate-500 mb-2">Saved: ${s.saved_at} (${s.cookie_count || 0} cookies)</div>` : ''}
+                <div class="flex gap-2">
+                    <button onclick="deleteSession('${p.id}')" class="text-xs px-3 py-1.5 bg-red-900/50 hover:bg-red-800/50 rounded-lg transition ${s.status === 'not_logged_in' ? 'opacity-50 pointer-events-none' : ''}">🗑️ Logout</button>
+                    <button onclick="showCookieUpload('${p.id}')" class="text-xs px-3 py-1.5 bg-blue-900/50 hover:bg-blue-800/50 rounded-lg transition">📤 Upload Cookies</button>
+                    <button onclick="showLoginInstructions('${p.id}')" class="text-xs px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg transition">ℹ️ How to Login</button>
+                </div>
+            </div>`;
+        });
+
+        html += `</div></div>`;
+        document.body.insertAdjacentHTML('beforeend', html);
+    }
+
+    async function deleteSession(platform) {
+        if (!confirm(\`Delete \${platform} session?\`)) return;
+        try {
+            await fetch(\`/api/sessions/\${platform}\`, { method: 'DELETE' });
+            showToast(\`\${platform} session deleted\`, 'info');
+            showSessionsModal(); // Refresh
+        } catch (e) {
+            showToast('Failed to delete session', 'error');
+        }
+    }
+
+    function showCookieUpload(platform) {
+        const html = \`<div class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)this.remove()">
+            <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full">
+                <h3 class="font-semibold mb-3">📤 Upload Cookies for \${platform}</h3>
+                <p class="text-sm text-slate-400 mb-3">Paste your cookies as JSON array from browser DevTools (F12 → Application → Cookies → Export)</p>
+                <textarea id="cookieInput" placeholder='[{"name":"sessionid","value":"...","domain":".linkedin.com"}]' rows="6" class="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg text-sm font-mono focus:outline-none focus:border-blue-500"></textarea>
+                <div class="flex gap-2 mt-3">
+                    <button onclick="uploadCookies('\${platform}')" class="flex-1 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition">Upload</button>
+                    <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition">Cancel</button>
+                </div>
+            </div>
+        </div>\`;
+        document.body.insertAdjacentHTML('beforeend', html);
+    }
+
+    async function uploadCookies(platform) {
+        const cookies = document.getElementById('cookieInput').value;
+        try {
+            const resp = await fetch(\`/api/sessions/\${platform}/cookies\`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cookies })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showToast(\`✅ \${platform}: \${data.cookie_count} cookies saved\`, 'success');
+                document.querySelector('.fixed').remove();
+                showSessionsModal();
+            } else {
+                showToast(\`Error: \${data.error}\`, 'error');
+            }
+        } catch (e) {
+            showToast('Failed to upload cookies', 'error');
+        }
+    }
+
+    async function showLoginInstructions(platform) {
+        const resp = await fetch(\`/api/sessions/\${platform}/login\`);
+        const data = await resp.json();
+        let html = \`<div class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)this.remove()">
+            <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto">
+                <h3 class="font-semibold mb-3">\${data.icon} How to Login to \${data.name}</h3>\`;
+        if (data.instructions) {
+            html += '<ol class="text-sm text-slate-300 space-y-2 mb-4">';
+            data.instructions.forEach(i => { html += \`<li>\${i}</li>\`; });
+            html += '</ol>';
+        }
+        if (data.playwright_script) {
+            html += \`<details class="mb-3"><summary class="text-sm text-blue-400 cursor-pointer">🐍 Show Playwright Script</summary>
+                <pre class="mt-2 p-3 bg-slate-800 rounded-lg text-xs font-mono overflow-x-auto text-slate-300">\${escHtml(data.playwright_script)}</pre></details>\`;
+        }
+        html += \`<button onclick="this.closest('.fixed').remove()" class="w-full py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition">Close</button></div></div>\`;
+        document.body.insertAdjacentHTML('beforeend', html);
     }
 
     // =====================================================================
