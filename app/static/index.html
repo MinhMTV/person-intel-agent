@@ -919,6 +919,14 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
         }
     }
 
+    async function copyAllEmails() {
+        const d = await fetch(`/api/dossier/${currentDossierId}`).then(r => r.json()).then(j => j.dossier);
+        const emails = d?.email_addresses || [];
+        if (!emails.length) { showToast('No emails found', 'warning'); return; }
+        await navigator.clipboard.writeText(emails.join('\n'));
+        showToast(`📋 ${emails.length} emails copied`, 'success', 3000);
+    }
+
     function setCompareTarget(id) {
         // Open compare dialog with this dossier pre-selected
         showCompareDialog().then(() => {
@@ -1134,6 +1142,7 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                 <button onclick="switchTab('images')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-300" data-tab="images">Images (${d.image_matches?.length || 0})</button>
                 <button onclick="switchTab('professional')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-300" data-tab="professional">Professional</button>
                 <button onclick="switchTab('emails')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-300" data-tab="emails">Emails (${d.email_addresses?.length || 0})</button>
+                ${d.email_addresses?.length ? `<button onclick="copyAllEmails()" class="ml-auto text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 transition" title="Copy all emails">📋 All</button>` : ''}
                 <button onclick="switchTab('timeline')" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-300" data-tab="timeline">⏱ Timeline</button>
             </div>
 
