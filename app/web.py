@@ -186,6 +186,33 @@ async def api_history(limit: int = 20):
     return {"history": _search_history[:limit]}
 
 
+@app.get("/api/history/export")
+async def api_history_export(fmt: str = "json"):
+    """Export search history as JSON or CSV."""
+    import csv
+    import io
+
+    if fmt == "csv":
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=["id", "name", "timestamp", "results"])
+        writer.writeheader()
+        for h in _search_history:
+            row = dict(h)
+            if "results" in row and isinstance(row["results"], dict):
+                row["results"] = "; ".join(f"{k}={v}" for k, v in row["results"].items())
+            writer.writerow(row)
+        return HTMLResponse(
+            content=output.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": 'attachment; filename="search_history.csv"'},
+        )
+    else:
+        return JSONResponse(
+            content=_search_history,
+            headers={"Content-Disposition": 'attachment; filename="search_history.json"'},
+        )
+
+
 @app.post("/api/login/{platform}")
 async def api_login(platform: str):
     """Trigger browser-based login for LinkedIn or Xing.
