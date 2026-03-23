@@ -1082,6 +1082,10 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                     <option value="medium">🟡 Medium</option>
                     <option value="low">🔴 Low</option>
                 </select>
+                <select id="filter-source" onchange="applyFilters()" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300">
+                    <option value="">All Sources</option>
+                    ${[...new Set(d.social_profiles.map(p => p.platform))].map(p => `<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('')}
+                </select>
                 <select id="filter-platform" onchange="applyFilters()" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300">
                     <option value="">All Platforms</option>
                     ${getPlatformOptions(d.social_profiles)}
