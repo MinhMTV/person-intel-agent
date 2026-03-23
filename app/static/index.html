@@ -49,7 +49,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                 </svg>
-                <h1 class="text-xl font-bold tracking-tight">Person Intel Agent</h1>
+                <h1 class="text-lg md:text-xl font-bold tracking-tight">Person Intel Agent</h1>
             </div>
             <div class="flex items-center gap-3">
                 <button id="themeToggle" onclick="toggleTheme()" class="text-slate-500 hover:text-slate-300 transition text-xl" title="Toggle theme">🌙</button>
@@ -70,30 +70,30 @@
                     <div id="globalSearchResults" class="absolute top-full left-0 right-0 mt-1 bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-xl z-40 hidden max-h-64 overflow-y-auto"></div>
                 </div>
             </div>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
-                    <div class="text-2xl font-bold text-blue-400" id="dash-searches">-</div>
-                    <div class="text-xs text-slate-500">Total Searches</div>
+            <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
+                    <div class="text-xl font-bold text-blue-400" id="dash-searches">-</div>
+                    <div class="text-xs text-slate-500">Searches</div>
                 </div>
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
-                    <div class="text-2xl font-bold text-green-400" id="dash-scanners">-</div>
-                    <div class="text-xs text-slate-500">Scanners Available</div>
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
+                    <div class="text-xl font-bold text-green-400" id="dash-scanners">-</div>
+                    <div class="text-xs text-slate-500">Scanners</div>
                 </div>
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
-                    <div class="text-2xl font-bold text-purple-400" id="dash-platforms">-</div>
-                    <div class="text-xs text-slate-500">Platforms Tracked</div>
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
+                    <div class="text-xl font-bold text-purple-400" id="dash-platforms">-</div>
+                    <div class="text-xs text-slate-500">Platforms</div>
                 </div>
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
-                    <div class="text-2xl font-bold text-amber-400" id="dash-bulk">-</div>
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
+                    <div class="text-xl font-bold text-amber-400" id="dash-bulk">-</div>
                     <div class="text-xs text-slate-500">Bulk Jobs</div>
                 </div>
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
-                    <div class="text-2xl font-bold text-rose-400" id="dash-dossiers">-</div>
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
+                    <div class="text-xl font-bold text-rose-400" id="dash-dossiers">-</div>
                     <div class="text-xs text-slate-500">Dossiers</div>
                 </div>
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
-                    <div class="text-2xl font-bold text-cyan-400" id="dash-conf">-</div>
-                    <div class="text-xs text-slate-500">Avg Confidence</div>
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
+                    <div class="text-xl font-bold text-cyan-400" id="dash-conf">-</div>
+                    <div class="text-xs text-slate-500">Avg Conf</div>
                 </div>
             </div>
             <div id="search-timeline" class="bg-slate-900 border border-slate-800 rounded-xl p-4 hidden">
