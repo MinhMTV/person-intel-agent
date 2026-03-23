@@ -11,6 +11,7 @@ Usage:
 
 import argparse
 import os
+import socket
 import sys
 import subprocess
 import time
@@ -65,10 +66,44 @@ def ensure_browser_binaries():
         print("✅ Playwright Chromium bereit.")
     return True
 
+
+def find_port_process(port: int) -> str | None:
+    """Return a short description of the process listening on a port."""
+    try:
+        result = subprocess.run(
+            ["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except Exception:
+        return None
+
+    lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    if len(lines) >= 2:
+        return lines[1]
+    return None
+
+
+def port_is_available(port: int) -> bool:
+    """Check whether a TCP port is free on localhost."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        return sock.connect_ex(("127.0.0.1", port)) != 0
+
 def start_webapp(port: int, open_browser: bool):
     """Startet die Webapp."""
     app_dir = Path(__file__).parent
     os.chdir(app_dir)
+
+    if not port_is_available(port):
+        print(f"\n⚠️ Port {port} ist bereits belegt.")
+        proc = find_port_process(port)
+        if proc:
+            print(f"   Listener: {proc}")
+        print(f"   Starte z.B. mit: python run.py --port {port + 1}")
+        print(f"   Oder beende den Prozess auf Port {port} und versuche es erneut.")
+        return
     
     print(f"\n{'='*50}")
     print(f"🚀 Person Intel Agent Webapp")
@@ -96,6 +131,8 @@ def start_webapp(port: int, open_browser: bool):
         ], check=True)
     except KeyboardInterrupt:
         print("\n👋 Webapp gestoppt!")
+    except subprocess.CalledProcessError as e:
+        print(f"\n❌ Webapp konnte nicht gestartet werden (exit {e.returncode}).")
 
 def main():
     parser = argparse.ArgumentParser(description="Person Intel Agent Webapp Starter")

@@ -20,6 +20,7 @@ from typing import Optional
 import httpx
 
 from app.models import PersonQuery, SocialProfile, SearchResult, Source, Confidence
+from app.login_manager import load_cookies
 
 
 class DeepSocialScanner:
@@ -40,6 +41,7 @@ class DeepSocialScanner:
         if self._instaloader is None:
             import instaloader
             self._instaloader = instaloader.Instaloader(
+                quiet=True,
                 download_pictures=False,
                 download_videos=False,
                 download_video_thumbnails=False,
@@ -47,23 +49,47 @@ class DeepSocialScanner:
                 download_comments=False,
                 save_metadata=False,
                 compress_json=False,
+                max_connection_attempts=1,
             )
         return self._instaloader
+
+    def _apply_instagram_session_cookies(self) -> None:
+        """Reuse saved Instagram cookies for instaloader if available."""
+        cookies = load_cookies("instagram") or []
+        if not cookies:
+            return
+
+        session = self.instaloader.context._session
+        for cookie in cookies:
+            name = cookie.get("name")
+            value = cookie.get("value")
+            domain = cookie.get("domain") or ".instagram.com"
+            path = cookie.get("path") or "/"
+            if not name or value is None:
+                continue
+            try:
+                session.cookies.set(name, value, domain=domain, path=path)
+            except Exception:
+                continue
 
     async def scan(self, query: PersonQuery) -> list:
         """Run deep social media scan."""
         results = []
         usernames = self._generate_usernames(query)
+        selected_platforms = set(p.lower() for p in query.include_platforms or [])
 
         # Run all platform scrapers
-        tasks = [
-            self._scrape_github_deep(query, usernames),
-            self._scrape_reddit(query, usernames),
-            self._scrape_stackoverflow(query, usernames),
-        ]
+        tasks = []
+        if not selected_platforms or "github" in selected_platforms:
+            tasks.append(self._scrape_github_deep(query, usernames))
+        if not selected_platforms or "reddit" in selected_platforms:
+            tasks.append(self._scrape_reddit(query, usernames))
+        if not selected_platforms or "stackoverflow" in selected_platforms:
+            tasks.append(self._scrape_stackoverflow(query, usernames))
         # Instagram is sync, run separately
-        instagram_results = await self._scrape_instagram_deep(query, usernames)
-        results.extend(instagram_results)
+        if not selected_platforms or "instagram" in selected_platforms:
+            instagram_results = await self._scrape_instagram_deep(query, usernames)
+            results.extend(instagram_results)
 
         # Run async scrapers
         for coro in asyncio.as_completed(tasks):
@@ -136,6 +162,7 @@ class DeepSocialScanner:
         try:
             import instaloader
 
+            self._apply_instagram_session_cookies()
             profile = instaloader.Profile.from_username(
                 self.instaloader.context, username
             )
@@ -148,6 +175,7 @@ class DeepSocialScanner:
                 url=f"https://instagram.com/{username}",
                 username=username,
                 display_name=full_name,
+                image_url=getattr(profile, "profile_pic_url", None),
                 bio=bio[:200] if bio else None,
                 followers=profile.followers,
                 verified=profile.is_verified,
@@ -254,6 +282,7 @@ class DeepSocialScanner:
                 url=data.get("html_url", f"https://github.com/{login}"),
                 username=login,
                 display_name=name or login,
+                image_url=data.get("avatar_url"),
                 bio=full_bio[:200] if full_bio else None,
                 followers=data.get("followers"),
                 confidence=confidence,

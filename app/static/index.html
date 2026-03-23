@@ -19,6 +19,18 @@
         .htmx-request .btn-text { display: none; }
         @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.4} }
         .pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+        @keyframes search-progress-indeterminate {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(280%); }
+        }
+        .search-progress-active::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            width: 35%;
+            background: linear-gradient(90deg, rgba(59,130,246,0), rgba(59,130,246,.95), rgba(125,211,252,.9), rgba(59,130,246,0));
+            animation: search-progress-indeterminate 1.4s ease-in-out infinite;
+        }
         .drop-zone.drag-over { border-color: #3b82f6; background-color: rgba(59,130,246,.1); }
 
         /* Light theme */
@@ -66,7 +78,8 @@
         <section id="dashboard" class="mb-8">
             <div class="flex items-center gap-4 mb-6">
                 <div class="flex-1 relative">
-                    <input type="text" id="globalDossierSearch" placeholder="🔍 Search across all dossiers..." oninput="globalSearchDossiers()" onfocus="globalSearchDossiers()" class="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-blue-500 transition placeholder-slate-500">
+                    <label for="globalDossierSearch" class="sr-only">Search Across Dossiers</label>
+                    <input type="text" id="globalDossierSearch" autocomplete="off" placeholder="🔍 Search across all dossiers..." oninput="globalSearchDossiers()" onfocus="globalSearchDossiers()" class="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-blue-500 transition placeholder-slate-500">
                     <div id="globalSearchResults" class="absolute top-full left-0 right-0 mt-1 bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-xl z-40 hidden max-h-64 overflow-y-auto"></div>
                 </div>
             </div>
@@ -115,6 +128,7 @@
         <section class="mb-8" id="search-section">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-lg font-semibold text-slate-300">New Search</h2>
+                <label for="templateSelector" class="sr-only">Search Template</label>
                 <select id="templateSelector" onchange="applyTemplate(this.value)" class="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:outline-none focus:border-blue-500">
                     <option value="">-- Search Template --</option>
                 </select>
@@ -129,8 +143,9 @@
 
                 <!-- Name (required) -->
                 <div class="relative">
-                    <label class="block text-sm font-medium text-slate-400 mb-1">Full Name <span class="text-red-400">*</span></label>
+                    <label for="name-input" class="block text-sm font-medium text-slate-400 mb-1">Full Name <span class="text-red-400">*</span></label>
                     <input type="text" name="name" required id="name-input"
+                        autocomplete="name"
                         placeholder="e.g. John Smith"
                         oninput="suggestNames(this.value)"
                         onblur="setTimeout(() => hideSuggestions(), 200)"
@@ -139,116 +154,139 @@
                     <div id="name-suggestions" class="absolute z-20 w-full bg-slate-800 border border-slate-700 rounded-lg mt-1 shadow-xl hidden max-h-48 overflow-y-auto"></div>
                 </div>
 
-                <!-- Locations (multi-input) -->
-                <div>
-                    <label class="block text-sm font-medium text-slate-400 mb-1">Locations</label>
-                    <div id="locations-container" class="flex flex-wrap gap-2 mb-2"></div>
-                    <div class="flex gap-2">
-                        <input type="text" id="locations-input" placeholder="e.g. Berlin, NRW"
-                            class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100
-                                   placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <button type="button" onclick="addSearchChip('locations')" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">+ Add</button>
-                    </div>
-                    <input type="hidden" name="locations" id="locations-hidden">
-                </div>
+                <details class="bg-slate-800/20 border border-slate-800 rounded-xl p-4" open>
+                    <summary class="cursor-pointer text-sm font-medium text-slate-300">Location Filter</summary>
+                    <div class="pt-4 space-y-5">
+                        <div>
+                            <label for="locations-input" class="block text-sm font-medium text-slate-400 mb-1">Locations</label>
+                            <div id="locations-container" class="flex flex-wrap gap-2 mb-2"></div>
+                            <div class="flex gap-2">
+                                <input type="text" id="locations-input" autocomplete="off" placeholder="e.g. Berlin, NRW"
+                                    class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100
+                                           placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <button type="button" onclick="addSearchChip('locations')" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">+ Add</button>
+                            </div>
+                            <input type="hidden" name="locations" id="locations-hidden">
+                        </div>
 
-                <!-- Usernames (multi-input) -->
-                <div>
-                    <label class="block text-sm font-medium text-slate-400 mb-1">Usernames</label>
-                    <div id="usernames-container" class="flex flex-wrap gap-2 mb-2"></div>
-                    <div class="flex gap-2">
-                        <input type="text" id="usernames-input" placeholder="e.g. jsmith, john_smith"
-                            class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100
-                                   placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <button type="button" onclick="addSearchChip('usernames')" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">+ Add</button>
-                    </div>
-                    <input type="hidden" name="usernames" id="usernames-hidden">
-                </div>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div class="bg-slate-800/40 border border-slate-800 rounded-xl p-4 space-y-3">
+                                <div>
+                                    <h3 class="text-sm font-medium text-slate-300">Geography Include</h3>
+                                    <p class="text-xs text-slate-500">Prioritize these regions during search.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-2">Continents</label>
+                                    <div class="grid grid-cols-2 gap-2 text-sm">
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="include_continents" value="Europe" class="rounded bg-slate-900 border-slate-700">Europe</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="include_continents" value="North America" class="rounded bg-slate-900 border-slate-700">North America</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="include_continents" value="South America" class="rounded bg-slate-900 border-slate-700">South America</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="include_continents" value="Asia" class="rounded bg-slate-900 border-slate-700">Asia</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="include_continents" value="Africa" class="rounded bg-slate-900 border-slate-700">Africa</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="include_continents" value="Oceania" class="rounded bg-slate-900 border-slate-700">Oceania</label>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-2">Countries</label>
+                                    <div class="grid grid-cols-2 gap-2 text-sm">
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="include_countries" value="DE" class="rounded bg-slate-900 border-slate-700">Germany</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="include_countries" value="AT" class="rounded bg-slate-900 border-slate-700">Austria</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="include_countries" value="CH" class="rounded bg-slate-900 border-slate-700">Switzerland</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="include_countries" value="US" class="rounded bg-slate-900 border-slate-700">United States</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="include_countries" value="GB" class="rounded bg-slate-900 border-slate-700">United Kingdom</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="include_countries" value="VN" class="rounded bg-slate-900 border-slate-700">Vietnam</label>
+                                    </div>
+                                </div>
+                            </div>
 
-                <!-- Nicknames (multi-input) -->
-                <div>
-                    <label class="block text-sm font-medium text-slate-400 mb-1">Nicknames</label>
-                    <div id="nicknames-container" class="flex flex-wrap gap-2 mb-2"></div>
-                    <div class="flex gap-2">
-                        <input type="text" id="nicknames-input" placeholder="e.g. Johnny"
-                            class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100
-                                   placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <button type="button" onclick="addSearchChip('nicknames')" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">+ Add</button>
+                            <div class="bg-slate-800/40 border border-slate-800 rounded-xl p-4 space-y-3">
+                                <div>
+                                    <h3 class="text-sm font-medium text-slate-300">Geography Exclude</h3>
+                                    <p class="text-xs text-slate-500">Reduce noise from these regions.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-2">Continents</label>
+                                    <div class="grid grid-cols-2 gap-2 text-sm">
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="exclude_continents" value="Europe" class="rounded bg-slate-900 border-slate-700">Europe</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="exclude_continents" value="North America" class="rounded bg-slate-900 border-slate-700">North America</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="exclude_continents" value="South America" class="rounded bg-slate-900 border-slate-700">South America</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="exclude_continents" value="Asia" class="rounded bg-slate-900 border-slate-700">Asia</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="exclude_continents" value="Africa" class="rounded bg-slate-900 border-slate-700">Africa</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="exclude_continents" value="Oceania" class="rounded bg-slate-900 border-slate-700">Oceania</label>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-2">Countries</label>
+                                    <div class="grid grid-cols-2 gap-2 text-sm">
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="exclude_countries" value="DE" class="rounded bg-slate-900 border-slate-700">Germany</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="exclude_countries" value="AT" class="rounded bg-slate-900 border-slate-700">Austria</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="exclude_countries" value="CH" class="rounded bg-slate-900 border-slate-700">Switzerland</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="exclude_countries" value="US" class="rounded bg-slate-900 border-slate-700">United States</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="exclude_countries" value="GB" class="rounded bg-slate-900 border-slate-700">United Kingdom</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" name="exclude_countries" value="VN" class="rounded bg-slate-900 border-slate-700">Vietnam</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <input type="hidden" name="nicknames" id="nicknames-hidden">
-                </div>
+                </details>
+
+                <details class="bg-slate-800/20 border border-slate-800 rounded-xl p-4" open>
+                    <summary class="cursor-pointer text-sm font-medium text-slate-300">Social Filter</summary>
+                    <div class="pt-4 space-y-5">
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="usernames-input" class="block text-sm font-medium text-slate-400 mb-1">Usernames</label>
+                                <div id="usernames-container" class="flex flex-wrap gap-2 mb-2"></div>
+                                <div class="flex gap-2">
+                                    <input type="text" id="usernames-input" autocomplete="username" placeholder="e.g. jsmith, john_smith"
+                                        class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100
+                                               placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <button type="button" onclick="addSearchChip('usernames')" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">+ Add</button>
+                                </div>
+                                <input type="hidden" name="usernames" id="usernames-hidden">
+                            </div>
+
+                            <div>
+                                <label for="nicknames-input" class="block text-sm font-medium text-slate-400 mb-1">Nicknames</label>
+                                <div id="nicknames-container" class="flex flex-wrap gap-2 mb-2"></div>
+                                <div class="flex gap-2">
+                                    <input type="text" id="nicknames-input" autocomplete="nickname" placeholder="e.g. Johnny"
+                                        class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100
+                                               placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <button type="button" onclick="addSearchChip('nicknames')" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">+ Add</button>
+                                </div>
+                                <input type="hidden" name="nicknames" id="nicknames-hidden">
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="text-sm font-medium text-slate-400 mb-2">Platforms to search</div>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                                <label class="flex items-center gap-2"><input type="checkbox" name="include_platforms" value="linkedin" class="rounded bg-slate-900 border-slate-700" checked>LinkedIn</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="include_platforms" value="xing" class="rounded bg-slate-900 border-slate-700" checked>Xing</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="include_platforms" value="instagram" class="rounded bg-slate-900 border-slate-700" checked>Instagram</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="include_platforms" value="facebook" class="rounded bg-slate-900 border-slate-700" checked>Facebook</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="include_platforms" value="github" class="rounded bg-slate-900 border-slate-700" checked>GitHub</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="include_platforms" value="twitter" class="rounded bg-slate-900 border-slate-700" checked>Twitter/X</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="include_platforms" value="reddit" class="rounded bg-slate-900 border-slate-700">Reddit</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="include_platforms" value="tiktok" class="rounded bg-slate-900 border-slate-700">TikTok</label>
+                            </div>
+                        </div>
+                    </div>
+                </details>
 
                 <!-- Email -->
                 <div>
-                    <label class="block text-sm font-medium text-slate-400 mb-1">Known Emails</label>
-                    <input type="text" name="email" placeholder="e.g. john@example.com"
+                    <label for="email-input" class="block text-sm font-medium text-slate-400 mb-1">Known Emails</label>
+                    <input type="text" id="email-input" name="email" autocomplete="email" placeholder="e.g. john@example.com"
                         class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100
                                placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
 
-                <div class="grid md:grid-cols-2 gap-4">
-                    <div class="bg-slate-800/40 border border-slate-800 rounded-xl p-4 space-y-3">
-                        <div>
-                            <h3 class="text-sm font-medium text-slate-300">Geography Include</h3>
-                            <p class="text-xs text-slate-500">Prioritize these regions during search.</p>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-500 mb-2">Continents</label>
-                            <div class="grid grid-cols-2 gap-2 text-sm">
-                                <label class="flex items-center gap-2"><input type="checkbox" name="include_continents" value="Europe" class="rounded bg-slate-900 border-slate-700">Europe</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="include_continents" value="North America" class="rounded bg-slate-900 border-slate-700">North America</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="include_continents" value="South America" class="rounded bg-slate-900 border-slate-700">South America</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="include_continents" value="Asia" class="rounded bg-slate-900 border-slate-700">Asia</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="include_continents" value="Africa" class="rounded bg-slate-900 border-slate-700">Africa</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="include_continents" value="Oceania" class="rounded bg-slate-900 border-slate-700">Oceania</label>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-500 mb-2">Countries</label>
-                            <div class="grid grid-cols-2 gap-2 text-sm">
-                                <label class="flex items-center gap-2"><input type="checkbox" name="include_countries" value="DE" class="rounded bg-slate-900 border-slate-700">Germany</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="include_countries" value="AT" class="rounded bg-slate-900 border-slate-700">Austria</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="include_countries" value="CH" class="rounded bg-slate-900 border-slate-700">Switzerland</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="include_countries" value="US" class="rounded bg-slate-900 border-slate-700">United States</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="include_countries" value="GB" class="rounded bg-slate-900 border-slate-700">United Kingdom</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="include_countries" value="VN" class="rounded bg-slate-900 border-slate-700">Vietnam</label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="bg-slate-800/40 border border-slate-800 rounded-xl p-4 space-y-3">
-                        <div>
-                            <h3 class="text-sm font-medium text-slate-300">Geography Exclude</h3>
-                            <p class="text-xs text-slate-500">Reduce noise from these regions.</p>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-500 mb-2">Continents</label>
-                            <div class="grid grid-cols-2 gap-2 text-sm">
-                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_continents" value="Europe" class="rounded bg-slate-900 border-slate-700">Europe</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_continents" value="North America" class="rounded bg-slate-900 border-slate-700">North America</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_continents" value="South America" class="rounded bg-slate-900 border-slate-700">South America</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_continents" value="Asia" class="rounded bg-slate-900 border-slate-700">Asia</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_continents" value="Africa" class="rounded bg-slate-900 border-slate-700">Africa</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_continents" value="Oceania" class="rounded bg-slate-900 border-slate-700">Oceania</label>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-500 mb-2">Countries</label>
-                            <div class="grid grid-cols-2 gap-2 text-sm">
-                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_countries" value="DE" class="rounded bg-slate-900 border-slate-700">Germany</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_countries" value="AT" class="rounded bg-slate-900 border-slate-700">Austria</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_countries" value="CH" class="rounded bg-slate-900 border-slate-700">Switzerland</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_countries" value="US" class="rounded bg-slate-900 border-slate-700">United States</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_countries" value="GB" class="rounded bg-slate-900 border-slate-700">United Kingdom</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="exclude_countries" value="VN" class="rounded bg-slate-900 border-slate-700">Vietnam</label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Photo Upload (drag & drop) -->
                 <div>
-                    <label class="block text-sm font-medium text-slate-400 mb-1">Reference Photo</label>
+                    <label for="photoInput" class="block text-sm font-medium text-slate-400 mb-1">Reference Photo</label>
                     <div id="dropZone" class="drop-zone border-2 border-dashed border-slate-700 rounded-xl p-8 text-center cursor-pointer
                          hover:border-blue-500 transition-colors">
                         <svg class="w-10 h-10 mx-auto mb-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -281,6 +319,23 @@
                     </button>
                     <span id="search-status" class="text-sm text-slate-500"></span>
                 </div>
+
+                <div id="search-progress-panel" class="hidden rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4 space-y-3">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <div class="text-sm font-medium text-blue-200">Search Running</div>
+                            <div id="search-progress-message" class="text-sm text-slate-300 mt-1">Preparing scanners and collecting leads...</div>
+                        </div>
+                        <div id="search-progress-elapsed" class="text-xs text-slate-500 whitespace-nowrap">0s</div>
+                    </div>
+                    <div class="h-3 rounded-full bg-slate-800 overflow-hidden border border-slate-700">
+                        <div id="search-progress-bar" class="relative h-full w-full overflow-hidden rounded-full bg-slate-800"></div>
+                    </div>
+                    <div class="flex items-center justify-between text-xs text-slate-500 gap-3">
+                        <span id="search-progress-stage">Starting search...</span>
+                        <span id="search-progress-hint">This can take a bit when images or logged-in platforms are included.</span>
+                    </div>
+                </div>
             </form>
         </section>
 
@@ -312,7 +367,8 @@
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-lg font-semibold text-slate-300">Search History</h2>
                 <div class="flex gap-2">
-                    <input type="text" id="historyFilter" placeholder="Filter history..." oninput="filterHistory()" class="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm w-40 focus:outline-none focus:border-blue-500 transition">
+                    <label for="historyFilter" class="sr-only">Filter History</label>
+                    <input type="text" id="historyFilter" autocomplete="off" placeholder="Filter history..." oninput="filterHistory()" class="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm w-40 focus:outline-none focus:border-blue-500 transition">
                     <a href="/api/history/export?fmt=csv" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">📥 CSV</a>
                     <a href="/api/history/export?fmt=json" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">📥 JSON</a>
                     <button onclick="copyHistoryJson()" class="text-sm px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition">📋 Copy</button>
@@ -341,6 +397,14 @@
     // Search Suggestions
     // =====================================================================
     let suggestTimeout = null;
+    let searchProgressTimer = null;
+    let searchProgressStartedAt = null;
+    const searchProgressMessages = [
+        'Preparing scanners and collecting leads...',
+        'Checking web, social, and professional sources...',
+        'Matching profiles and enriching preview data...',
+        'Building the dossier summary and confidence scores...',
+    ];
 
     async function suggestNames(query) {
         clearTimeout(suggestTimeout);
@@ -480,14 +544,70 @@
     // =====================================================================
     // HTMX response handling — render results
     // =====================================================================
+    function updateSearchProgressMessage() {
+        if (!searchProgressStartedAt) return;
+        const elapsedSeconds = Math.max(0, Math.floor((Date.now() - searchProgressStartedAt) / 1000));
+        const messageIdx = Math.min(searchProgressMessages.length - 1, Math.floor(elapsedSeconds / 6));
+        const elapsedEl = document.getElementById('search-progress-elapsed');
+        const messageEl = document.getElementById('search-progress-message');
+        const stageEl = document.getElementById('search-progress-stage');
+        if (elapsedEl) elapsedEl.textContent = `${elapsedSeconds}s`;
+        if (messageEl) messageEl.textContent = searchProgressMessages[messageIdx];
+        if (stageEl) stageEl.textContent = elapsedSeconds < 6
+            ? 'Starting search...'
+            : elapsedSeconds < 12
+                ? 'Scanning sources...'
+                : elapsedSeconds < 18
+                    ? 'Comparing and enriching results...'
+                    : 'Finalizing dossier...';
+    }
+
+    function startSearchProgress() {
+        const panel = document.getElementById('search-progress-panel');
+        const bar = document.getElementById('search-progress-bar');
+        const status = document.getElementById('search-status');
+        searchProgressStartedAt = Date.now();
+        clearInterval(searchProgressTimer);
+        if (panel) panel.classList.remove('hidden');
+        if (bar) bar.classList.add('search-progress-active');
+        if (status) status.textContent = 'Search in progress...';
+        updateSearchProgressMessage();
+        searchProgressTimer = setInterval(updateSearchProgressMessage, 1000);
+    }
+
+    function stopSearchProgress(finalStatus = '') {
+        const bar = document.getElementById('search-progress-bar');
+        const status = document.getElementById('search-status');
+        const stageEl = document.getElementById('search-progress-stage');
+        clearInterval(searchProgressTimer);
+        searchProgressTimer = null;
+        searchProgressStartedAt = null;
+        if (bar) bar.classList.remove('search-progress-active');
+        if (stageEl && finalStatus) stageEl.textContent = finalStatus;
+        if (status) status.textContent = finalStatus;
+    }
+
+    document.body.addEventListener('htmx:beforeRequest', function(evt) {
+        if (evt.detail.pathInfo.requestPath === '/api/search') {
+            startSearchProgress();
+        }
+    });
+
     document.body.addEventListener('htmx:afterRequest', function(evt) {
         if (evt.detail.pathInfo.requestPath === '/api/search' && evt.detail.successful) {
+            stopSearchProgress('Search complete');
             const data = JSON.parse(evt.detail.xhr.responseText);
             renderResults(data);
             loadHistory(); // Refresh history after new search
             loadDashboard();
             const total = (data.results?.social_profiles || 0) + (data.results?.web_results || 0) + (data.results?.image_matches || 0);
             showToast(`Search complete: ${total} results found`, 'success');
+        }
+    });
+
+    document.body.addEventListener('htmx:responseError', function(evt) {
+        if (evt.detail.pathInfo.requestPath === '/api/search') {
+            stopSearchProgress('Search failed');
         }
     });
 
@@ -1196,13 +1316,13 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                     <button onclick="this.closest('.fixed').remove()" class="text-slate-500 hover:text-white text-xl">&times;</button>
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">Dossier 1</label>
+                    <label for="compare-1" class="block text-sm text-slate-400 mb-1">Dossier 1</label>
                     <select id="compare-1" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-300">
                         ${compareHistoryCache.map(h => `<option value="${h.id}">${escHtml(h.name)} (${formatTime(h.timestamp)})</option>`).join('')}
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">Dossier 2</label>
+                    <label for="compare-2" class="block text-sm text-slate-400 mb-1">Dossier 2</label>
                     <select id="compare-2" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-300">
                         ${compareHistoryCache.map((h, i) => `<option value="${h.id}" ${i === 1 ? 'selected' : ''}>${escHtml(h.name)} (${formatTime(h.timestamp)})</option>`).join('')}
                     </select>
@@ -1350,10 +1470,46 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
         return chips.filter(c => c.value);
     }
 
+    function buildSummaryImageGallery(dossier) {
+        const items = [];
+        const seen = new Set();
+
+        (dossier.social_profiles || []).forEach(profile => {
+            const imageUrl = profile.image_url || null;
+            if (!imageUrl || seen.has(imageUrl)) return;
+            seen.add(imageUrl);
+            items.push({
+                image_url: imageUrl,
+                source_url: profile.url,
+                label: profile.display_name || profile.username || profile.platform,
+                meta: `${profile.platform}${profile.username ? ` · @${profile.username}` : ''}`,
+                score: profile.confidence === 'high' ? 0.95 : profile.confidence === 'medium' ? 0.75 : 0.55,
+            });
+        });
+
+        (dossier.image_matches || []).forEach(match => {
+            if (!match.image_url || seen.has(match.image_url)) return;
+            seen.add(match.image_url);
+            items.push({
+                image_url: match.image_url,
+                source_url: match.source_url,
+                label: match.context || match.source_url,
+                meta: `${((match.similarity_score || 0) * 100).toFixed(0)}% similarity`,
+                score: match.similarity_score || 0,
+            });
+        });
+
+        return items.sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 8);
+    }
+
     function renderExecutiveSummary(dossier, resultCounts) {
         const previewMap = buildImagePreviewMap(dossier);
+        const summaryImages = buildSummaryImageGallery(dossier);
         const topProfiles = [...(dossier.social_profiles || [])]
             .sort((a, b) => {
+                const aHasImage = (a.image_url || previewMap[a.url]?.image_url) ? 1 : 0;
+                const bHasImage = (b.image_url || previewMap[b.url]?.image_url) ? 1 : 0;
+                if (bHasImage !== aHasImage) return bHasImage - aHasImage;
                 const aScore = { high: 3, medium: 2, low: 1 }[a.confidence] || 0;
                 const bScore = { high: 3, medium: 2, low: 1 }[b.confidence] || 0;
                 return bScore - aScore;
@@ -1400,17 +1556,45 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                             </div>
                         </div>
                         ${scope.length ? `<div class="flex flex-wrap gap-2">${scope.map(item => `<span class="px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs text-slate-300">${escHtml(item.label)}: ${escHtml(item.value)}</span>`).join('')}</div>` : ''}
+                        ${summaryImages.length ? `
+                            <div>
+                                <div class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-3">Profile Images</div>
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                    ${summaryImages.map(item => `
+                                        <a href="${escHtml(item.source_url)}" target="_blank" rel="noopener" class="block rounded-2xl overflow-hidden border border-slate-800 bg-slate-900/80">
+                                            <img src="${escHtml(item.image_url)}" class="w-full h-28 object-cover" onerror="this.closest('a').style.display='none'">
+                                            <div class="p-2">
+                                                <div class="text-xs text-slate-200 truncate">${escHtml(item.label)}</div>
+                                                <div class="text-[11px] text-slate-500 truncate mt-1">${escHtml(item.meta)}</div>
+                                            </div>
+                                        </a>
+                                    `).join('')}
+                                </div>
+                            </div>` : ''}
                     </div>
                     <div class="rounded-2xl bg-slate-800/35 border border-slate-800 p-4">
                         <div class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-3">Top Leads</div>
+                        ${topImages.length ? `
+                            <div class="grid grid-cols-3 gap-3 mb-4">
+                                ${topImages.map(match => `
+                                    <a href="${escHtml(match.source_url)}" target="_blank" rel="noopener" class="block rounded-xl overflow-hidden border border-slate-800 bg-slate-900/80">
+                                        <img src="${escHtml(match.image_url)}" class="w-full h-24 object-cover" onerror="this.style.display='none'">
+                                        <div class="p-2">
+                                            <div class="text-[11px] text-slate-300 truncate">${escHtml(match.context || match.source_url)}</div>
+                                            <div class="text-[11px] ${scoreClass(match.similarity_score || 0)} font-semibold mt-1">${((match.similarity_score || 0) * 100).toFixed(0)}% similarity</div>
+                                        </div>
+                                    </a>
+                                `).join('')}
+                            </div>` : ''}
                         <div class="space-y-3">
                             ${topProfiles.length ? topProfiles.map(profile => {
-                                const preview = previewMap[profile.url];
+                                const preview = profile.image_url ? { image_url: profile.image_url } : previewMap[profile.url];
                                 return `
                                     <div class="flex items-center gap-3 rounded-xl bg-slate-900/70 border border-slate-800 p-3">
                                         ${preview?.image_url
-                                            ? `<img src="${escHtml(preview.image_url)}" class="w-12 h-12 rounded-xl object-cover border border-slate-700" onerror="this.replaceWith(document.createElement('div'))">`
+                                            ? `<img src="${escHtml(preview.image_url)}" class="w-12 h-12 rounded-xl object-cover border border-slate-700" onerror="this.style.display='none'; this.nextElementSibling?.classList.remove('hidden')">`
                                             : `<div class="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xl">${platformAvatar(profile.platform)}</div>`}
+                                        <div class="${preview?.image_url ? 'hidden ' : ''}w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xl">${platformAvatar(profile.platform)}</div>
                                         <div class="min-w-0 flex-1">
                                             <a href="${escHtml(profile.url)}" target="_blank" rel="noopener" class="block text-slate-100 font-medium hover:text-blue-300 truncate">${escHtml(profile.display_name || profile.username || profile.platform)}</a>
                                             <div class="text-xs text-slate-500 truncate">${escHtml(profile.platform)}${profile.username ? ` · @${escHtml(profile.username)}` : ''}</div>
@@ -1482,16 +1666,19 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
             <!-- Filter bar -->
             <div class="px-6 py-3 border-b border-slate-800 bg-slate-900/50 flex flex-wrap gap-3 items-center">
                 <span class="text-xs text-slate-500 font-medium">Filter:</span>
+                <label for="filter-confidence" class="sr-only">Filter Confidence</label>
                 <select id="filter-confidence" onchange="applyFilters()" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300">
                     <option value="">All Confidence</option>
                     <option value="high">🟢 High</option>
                     <option value="medium">🟡 Medium</option>
                     <option value="low">🔴 Low</option>
                 </select>
+                <label for="filter-source" class="sr-only">Filter Source</label>
                 <select id="filter-source" onchange="applyFilters()" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300">
                     <option value="">All Sources</option>
                     ${[...new Set(d.social_profiles.map(p => p.platform))].map(p => `<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('')}
                 </select>
+                <label for="filter-platform" class="sr-only">Filter Platform</label>
                 <select id="filter-platform" onchange="applyFilters()" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300">
                     <option value="">All Platforms</option>
                     ${getPlatformOptions(d.social_profiles)}
@@ -1504,7 +1691,8 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                     <input type="checkbox" id="filter-bio" onchange="applyFilters()" class="rounded bg-slate-800 border-slate-700">
                     Has bio
                 </label>
-                <input type="number" id="filter-min-sim" onchange="applyFilters()" placeholder="Min similarity %" min="0" max="100"
+                <label for="filter-min-sim" class="sr-only">Minimum Similarity Percent</label>
+                <input type="number" id="filter-min-sim" autocomplete="off" onchange="applyFilters()" placeholder="Min similarity %" min="0" max="100"
                     class="w-24 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300">
                 <button onclick="resetFilters()" class="text-xs text-slate-500 hover:text-slate-300 transition">Reset</button>
             </div>
@@ -1667,9 +1855,24 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
     // Render helpers
     function renderSocialProfiles(profiles) {
         if (!profiles || !profiles.length) return emptyState('No social profiles found.');
-        return `<div class="space-y-3">${profiles.map(p => `
+        const scoreMap = { high: 3, medium: 2, low: 1 };
+        const sortedProfiles = [...profiles].sort((a, b) => {
+            const aScore = scoreMap[a.confidence] || 0;
+            const bScore = scoreMap[b.confidence] || 0;
+            if (bScore !== aScore) return bScore - aScore;
+            const aImage = a.image_url ? 1 : 0;
+            const bImage = b.image_url ? 1 : 0;
+            if (bImage !== aImage) return bImage - aImage;
+            return (a.platform || '').localeCompare(b.platform || '');
+        });
+        return `<div class="space-y-3">${sortedProfiles.map(p => `
             <div class="flex items-center gap-4 p-4 bg-slate-800/50 rounded-2xl border border-slate-800">
-                <div class="w-14 h-14 rounded-2xl bg-slate-700 flex items-center justify-center text-2xl">${platformAvatar(p.platform)}</div>
+                <div class="relative w-14 h-14">
+                    ${p.image_url
+                        ? `<img src="${escHtml(p.image_url)}" class="w-14 h-14 rounded-2xl object-cover border border-slate-700" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden')">`
+                        : ''}
+                    <div class="${p.image_url ? 'hidden ' : ''}w-14 h-14 rounded-2xl bg-slate-700 border border-slate-700 flex items-center justify-center text-2xl">${platformAvatar(p.platform)}</div>
+                </div>
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2 flex-wrap">
                         <a href="${escHtml(p.url)}" target="_blank" rel="noopener" class="text-blue-400 hover:underline font-medium">${escHtml(p.display_name || p.username || p.platform)}</a>
@@ -1686,10 +1889,17 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
     function renderWebResults(results) {
         if (!results || !results.length) return emptyState('No web results found.');
         return `<div class="space-y-3">${results.slice(0, 20).map(r => `
-            <div class="p-3 bg-slate-800/50 rounded-xl relative">
-                <a href="${escHtml(r.url)}" target="_blank" rel="noopener" class="text-blue-400 hover:underline font-medium">${escHtml(r.title)}</a>
-                <div class="text-sm text-slate-500 truncate mt-1">${escHtml(r.snippet || r.url)}</div>
-                <div class="text-xs text-slate-600 mt-1">${escHtml(r.source)} · ${escHtml(r.confidence)}</div>
+            <div class="p-3 bg-slate-800/50 rounded-xl relative flex gap-4 items-start">
+                <div class="w-16 h-16 rounded-xl overflow-hidden bg-slate-900 border border-slate-700 flex-shrink-0 flex items-center justify-center">
+                    ${r.image_url
+                        ? `<img src="${escHtml(r.image_url)}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=&quot;text-xl&quot;>🌐</span>'">`
+                        : '<span class="text-xl">🌐</span>'}
+                </div>
+                <div class="min-w-0 flex-1">
+                    <a href="${escHtml(r.url)}" target="_blank" rel="noopener" class="text-blue-400 hover:underline font-medium">${escHtml(r.title)}</a>
+                    <div class="text-sm text-slate-500 truncate mt-1">${escHtml(r.snippet || r.url)}</div>
+                    <div class="text-xs text-slate-600 mt-1">${escHtml(r.source)} · ${escHtml(r.confidence)}</div>
+                </div>
                 <button onclick="copyProfileJson(this, '${escHtml(JSON.stringify(r))}')" class="absolute top-3 right-3 text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 transition" title="Copy as JSON">📋</button>
             </div>`).join('')}</div>`;
     }
@@ -2068,6 +2278,7 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                 ${s.saved_at ? `<div class="text-xs text-slate-500 mb-2">Saved: ${s.saved_at} (${s.cookie_count || 0} cookies)</div>` : ''}
                 <div class="flex gap-2 flex-wrap">
                     <button onclick="startPlatformLogin('${p.id}')" class="text-xs px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 rounded-lg transition">🔐 Login</button>
+                    <button onclick="verifyPlatformSession('${p.id}')" class="text-xs px-3 py-1.5 bg-cyan-800 hover:bg-cyan-700 rounded-lg transition">🧪 Verify</button>
                     <button onclick="deleteSession('${p.id}')" class="text-xs px-3 py-1.5 bg-red-900/50 hover:bg-red-800/50 rounded-lg transition ${s.status === 'not_logged_in' ? 'opacity-50 pointer-events-none' : ''}">🗑️ Logout</button>
                     <button onclick="showCookieUpload('${p.id}')" class="text-xs px-3 py-1.5 bg-blue-900/50 hover:bg-blue-800/50 rounded-lg transition">📤 Upload Cookies</button>
                     <button onclick="showLoginInstructions('${p.id}')" class="text-xs px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg transition">ℹ️ How to Login</button>
@@ -2106,13 +2317,30 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
         }
     }
 
+    async function verifyPlatformSession(platform) {
+        showToast(`Checking ${platform} session...`, 'info', 3000);
+        try {
+            const resp = await fetch(`/api/sessions/${platform}/verify`);
+            const data = await resp.json();
+            if (resp.ok && data.success) {
+                showToast(`✅ ${platform} session is valid`, 'success', 5000);
+            } else {
+                showToast(data.error || `${platform} session is not valid`, 'warning', 7000);
+            }
+            showSessionsModal();
+        } catch (e) {
+            showToast(`Failed to verify ${platform} session`, 'error');
+        }
+    }
+
     function showCookieUpload(platform) {
         closeModalById('cookie-upload-modal');
         const html = `<div id="cookie-upload-modal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)this.remove()">
             <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full">
                 <h3 class="font-semibold mb-3">📤 Upload Cookies for ${platform}</h3>
                 <p class="text-sm text-slate-400 mb-3">Paste your cookies as JSON array from browser DevTools (F12 → Application → Cookies → Export)</p>
-                <textarea id="cookieInput" placeholder='[{"name":"sessionid","value":"...","domain":".linkedin.com"}]' rows="6" class="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg text-sm font-mono focus:outline-none focus:border-blue-500"></textarea>
+                <label for="cookieInput" class="sr-only">Cookie JSON</label>
+                <textarea id="cookieInput" autocomplete="off" placeholder='[{"name":"sessionid","value":"...","domain":".linkedin.com"}]' rows="6" class="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg text-sm font-mono focus:outline-none focus:border-blue-500"></textarea>
                 <div class="flex gap-2 mt-3">
                     <button onclick="uploadCookies('${platform}')" class="flex-1 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition">Upload</button>
                     <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition">Cancel</button>

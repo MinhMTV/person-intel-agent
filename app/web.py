@@ -10,13 +10,17 @@ import asyncio
 import io
 import json
 import os
+import re
 import shutil
 import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urljoin, urlparse
 
+import httpx
+from bs4 import BeautifulSoup
 from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -45,6 +49,7 @@ from app.login_manager import (
     get_login_instructions,
     import_cookies_from_json,
     start_interactive_login,
+    verify_session,
 )
 
 # ---------------------------------------------------------------------------
@@ -110,6 +115,7 @@ async def api_search(
     usernames: str = Form(""),
     nicknames: str = Form(""),
     email: str = Form(""),
+    include_platforms: list[str] = Form([]),
     include_countries: list[str] = Form([]),
     exclude_countries: list[str] = Form([]),
     include_continents: list[str] = Form([]),
@@ -151,6 +157,7 @@ async def api_search(
         nicknames=nick_list,
         locations=[Location(raw=loc) for loc in loc_list],
         countries=include_countries,
+        include_platforms=include_platforms,
         include_countries=include_countries,
         exclude_countries=exclude_countries,
         include_continents=include_continents,
@@ -706,6 +713,15 @@ async def api_session_delete(platform: str):
     return {"success": True, "platform": platform}
 
 
+@app.get("/api/sessions/{platform}/verify")
+async def api_session_verify(platform: str):
+    """Verify that a saved platform session still works."""
+    result = await verify_session(platform)
+    if result.get("error") and result.get("status") in {"error", "not_logged_in"}:
+        return JSONResponse(status_code=400, content=result)
+    return result
+
+
 @app.post("/api/login/{platform}")
 async def api_login(platform: str):
     """Backward-compatible login alias."""
@@ -955,6 +971,10 @@ async def _run_all_scanners(query: PersonQuery) -> PersonDossier:
                 else:
                     dossier.web_results.append(r)
 
+    await _enrich_web_result_images(dossier.web_results)
+    dossier.social_profiles.extend(_profiles_from_web_results(dossier.web_results, query))
+    await _enrich_profile_images(dossier.social_profiles)
+
     # Deduplicate results
     deduped = dedup_all(
         social=dossier.social_profiles,
@@ -989,3 +1009,172 @@ async def _run_all_scanners(query: PersonQuery) -> PersonDossier:
     )
 
     return dossier
+
+
+def _profiles_from_web_results(results: list[SearchResult], query: PersonQuery) -> list[SocialProfile]:
+    """Promote social-platform web hits into profile cards."""
+    domain_map = {
+        "linkedin.com": "linkedin",
+        "xing.com": "xing",
+        "instagram.com": "instagram",
+        "facebook.com": "facebook",
+        "github.com": "github",
+        "twitter.com": "twitter",
+        "x.com": "twitter",
+        "reddit.com": "reddit",
+        "tiktok.com": "tiktok",
+        "youtube.com": "youtube",
+    }
+    promoted: list[SocialProfile] = []
+    selected_platforms = set(p.lower() for p in query.include_platforms or [])
+    full_name = query.full_name.lower().strip()
+    name_tokens = [token for token in re.split(r"[^a-z0-9]+", full_name) if token]
+    first_name = (query.first_name or "").lower().strip()
+    last_name = (query.last_name or "").lower().strip()
+
+    for result in results:
+        parsed = urlparse((result.url or "").strip())
+        if not parsed.netloc:
+            continue
+        domain = parsed.netloc.lower().replace("www.", "")
+        platform = next((name for host, name in domain_map.items() if domain.endswith(host)), None)
+        if not platform:
+            continue
+        if selected_platforms and platform not in selected_platforms:
+            continue
+
+        display_blob = f"{result.title or ''} {result.snippet or ''}".lower()
+        path_blob = (parsed.path or "").lower()
+        matched_tokens = sum(1 for token in name_tokens if token in display_blob)
+        has_full_name = full_name and full_name in display_blob
+        has_first_last = bool(first_name and last_name and first_name in display_blob and last_name in display_blob)
+        path_matched_tokens = sum(1 for token in name_tokens if token in path_blob)
+
+        min_token_matches = len(name_tokens) if len(name_tokens) >= 3 else max(2, len(name_tokens))
+        if not (
+            has_full_name
+            or matched_tokens >= min_token_matches
+            or (len(name_tokens) <= 2 and has_first_last)
+            or (len(name_tokens) <= 2 and path_matched_tokens >= min_token_matches)
+        ):
+            continue
+
+        username = parsed.path.strip("/").split("/")[-1] if parsed.path.strip("/") else None
+        if username and username.startswith("@"):
+            username = username[1:]
+
+        confidence = Confidence.LOW
+        if has_full_name or matched_tokens >= len(name_tokens):
+            confidence = Confidence.HIGH
+        elif len(name_tokens) <= 2 and has_first_last:
+            confidence = Confidence.MEDIUM
+        elif matched_tokens >= min_token_matches:
+            confidence = Confidence.MEDIUM
+
+        if "/pub/dir/" in parsed.path.lower() or "/public/" in parsed.path.lower():
+            confidence = Confidence.LOW if confidence == Confidence.MEDIUM else confidence
+
+        promoted.append(SocialProfile(
+            platform=platform,
+            url=result.url,
+            username=username or None,
+            display_name=(result.title or username or platform)[:120],
+            image_url=getattr(result, "image_url", None),
+            bio=(result.snippet or None),
+            confidence=confidence,
+        ))
+
+    return promoted
+
+
+async def _enrich_profile_images(profiles: list[SocialProfile], limit: int = 10) -> None:
+    """Best-effort profile image extraction from public profile pages."""
+    candidates = [p for p in profiles if p.url and not p.image_url][:limit]
+    if not candidates:
+        return
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    }
+
+    async def fetch_image(profile: SocialProfile) -> None:
+        try:
+            async with httpx.AsyncClient(timeout=8, follow_redirects=True, headers=headers) as client:
+                resp = await client.get(profile.url)
+            if resp.status_code != 200 or "text/html" not in resp.headers.get("content-type", ""):
+                return
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+            selectors = [
+                ('meta[property="og:image"]', "content"),
+                ('meta[name="twitter:image"]', "content"),
+                ('meta[property="twitter:image"]', "content"),
+                ('meta[property="og:image:url"]', "content"),
+                ('meta[name="thumbnail"]', "content"),
+                ('img[alt*="profile" i]', "src"),
+                ('img[class*="avatar" i]', "src"),
+                ('img[class*="profile" i]', "src"),
+                ('img[data-testid*="avatar" i]', "src"),
+                ('img[src*="profile" i]', "src"),
+                ('img[src*="avatar" i]', "src"),
+            ]
+            for selector, attr in selectors:
+                el = soup.select_one(selector)
+                if not el:
+                    continue
+                value = el.get(attr)
+                if not value:
+                    continue
+                absolute_value = urljoin(str(resp.url), value)
+                if absolute_value.startswith(("http://", "https://")):
+                    profile.image_url = absolute_value
+                    return
+        except Exception:
+            return
+
+    await asyncio.gather(*(fetch_image(profile) for profile in candidates))
+
+
+async def _enrich_web_result_images(results: list[SearchResult], limit: int = 20) -> None:
+    """Best-effort image extraction for generic web results."""
+    candidates = [r for r in results if r.url and not getattr(r, "image_url", None)][:limit]
+    if not candidates:
+        return
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    }
+
+    async def fetch_image(result: SearchResult) -> None:
+        try:
+            async with httpx.AsyncClient(timeout=8, follow_redirects=True, headers=headers) as client:
+                resp = await client.get(result.url)
+            if resp.status_code != 200 or "text/html" not in resp.headers.get("content-type", ""):
+                return
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+            selectors = [
+                ('meta[property="og:image"]', "content"),
+                ('meta[name="twitter:image"]', "content"),
+                ('meta[property="twitter:image"]', "content"),
+                ('meta[property="og:image:url"]', "content"),
+                ('meta[name="thumbnail"]', "content"),
+                ('link[rel="image_src"]', "href"),
+            ]
+            for selector, attr in selectors:
+                el = soup.select_one(selector)
+                if not el:
+                    continue
+                value = el.get(attr)
+                if not value:
+                    continue
+                absolute_value = urljoin(str(resp.url), value)
+                if absolute_value.startswith(("http://", "https://")):
+                    result.image_url = absolute_value
+                    return
+        except Exception:
+            return
+
+    await asyncio.gather(*(fetch_image(result) for result in candidates))

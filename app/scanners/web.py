@@ -76,13 +76,24 @@ class WebScanner(BaseScanner):
 
         # Site-specific searches
         name = f'"{query.full_name}"'
-        searches.extend([
-            f"{name} site:linkedin.com",
-            f"{name} site:xing.com",
-            f"{name} site:facebook.com",
-            f"{name} site:twitter.com",
-            f"{name} site:github.com",
-        ])
+        platform_sites = {
+            "linkedin": "linkedin.com",
+            "xing": "xing.com",
+            "facebook": "facebook.com",
+            "twitter": "twitter.com",
+            "github": "github.com",
+            "instagram": "instagram.com",
+            "reddit": "reddit.com",
+            "tiktok": "tiktok.com",
+            "youtube": "youtube.com",
+        }
+        selected_platforms = set(p.lower() for p in query.include_platforms or [])
+        sites = (
+            [platform_sites[p] for p in selected_platforms if p in platform_sites]
+            if selected_platforms
+            else ["linkedin.com", "xing.com", "facebook.com", "twitter.com", "github.com", "instagram.com"]
+        )
+        searches.extend([f"{name} site:{site}" for site in sites])
 
         return searches
 

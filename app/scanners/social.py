@@ -28,14 +28,18 @@ class SocialScanner(BaseScanner):
     async def scan(self, query: PersonQuery) -> list[SocialProfile]:
         """Run social media scan."""
         results = []
+        selected_platforms = set(p.lower() for p in query.include_platforms or [])
 
         # Generate usernames from name
-        usernames = self._generate_usernames(query)
+        usernames = self._generate_usernames(query)[:6]
 
         # Check known platforms
-        for username in usernames:
-            platform_results = await self._check_username(username)
-            results.extend(platform_results)
+        checks = [self._check_username(username, selected_platforms) for username in usernames]
+        completed = await asyncio.gather(*checks, return_exceptions=True)
+        for item in completed:
+            if isinstance(item, Exception):
+                continue
+            results.extend(item)
 
         # Deduplicate
         seen = set()
@@ -77,24 +81,46 @@ class SocialScanner(BaseScanner):
 
         return list(set(usernames))
 
-    async def _check_username(self, username: str) -> list[SocialProfile]:
+    async def _check_username(self, username: str, selected_platforms: set[str] | None = None) -> list[SocialProfile]:
         """Check a username against known platforms."""
         import httpx
         results = []
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        }
+        selected_platforms = selected_platforms or set()
+        platforms = [
+            (platform, url_template)
+            for platform, url_template in self.KNOWN_PLATFORMS.items()
+            if not selected_platforms or platform.lower() in selected_platforms
+        ]
 
-        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
-            for platform, url_template in self.KNOWN_PLATFORMS.items():
+        timeout = httpx.Timeout(connect=2.0, read=3.0, write=3.0, pool=3.0)
+        limits = httpx.Limits(max_connections=8, max_keepalive_connections=4)
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True, headers=headers, limits=limits) as client:
+            async def check_platform(platform: str, url_template: str):
                 url = url_template.format(username)
                 try:
-                    resp = await client.head(url)
-                    if resp.status_code == 200:
-                        results.append(SocialProfile(
+                    resp = await client.get(url)
+                    final_url = str(resp.url)
+                    if resp.status_code == 200 and username.lower() in final_url.lower():
+                        return SocialProfile(
                             platform=platform,
-                            url=url,
+                            url=final_url,
                             username=username,
                             confidence=Confidence.MEDIUM,
-                        ))
+                        )
                 except Exception:
-                    pass  # Timeout or connection error — skip
+                    return None
+                return None
+
+            completed = await asyncio.gather(
+                *(check_platform(platform, url_template) for platform, url_template in platforms),
+                return_exceptions=True,
+            )
+            for item in completed:
+                if isinstance(item, SocialProfile):
+                    results.append(item)
 
         return results

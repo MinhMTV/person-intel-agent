@@ -42,6 +42,7 @@ class SocialProfile(BaseModel):
     url: str
     username: Optional[str] = None
     display_name: Optional[str] = None
+    image_url: Optional[str] = None
     bio: Optional[str] = None
     followers: Optional[int] = None
     verified: bool = False
@@ -54,6 +55,7 @@ class SearchResult(BaseModel):
     title: str
     url: str
     snippet: Optional[str] = None
+    image_url: Optional[str] = None
     confidence: Confidence = Confidence.MEDIUM
     found_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -74,6 +76,7 @@ class PersonQuery(BaseModel):
     nicknames: list[str] = Field(default_factory=list)
     locations: list[Location] = Field(default_factory=list)
     countries: list[str] = Field(default_factory=list)
+    include_platforms: list[str] = Field(default_factory=list)
     include_countries: list[str] = Field(default_factory=list)
     exclude_countries: list[str] = Field(default_factory=list)
     include_continents: list[str] = Field(default_factory=list)

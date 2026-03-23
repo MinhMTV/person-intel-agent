@@ -31,10 +31,11 @@ PLATFORMS = {
         "check_url": "https://www.linkedin.com/feed/",
         "icon": "💼",
         "cookie_domain": ".linkedin.com",
+        "auth_cookie_names": ["li_at"],
     },
     "xing": {
         "name": "Xing",
-        "login_url": "https://www.xing.com/login",
+        "login_url": "https://login.xing.com/",
         "check_url": "https://www.xing.com/feed",
         "icon": "🔷",
         "cookie_domain": ".xing.com",
@@ -45,6 +46,8 @@ PLATFORMS = {
         "check_url": "https://www.instagram.com/",
         "icon": "📷",
         "cookie_domain": ".instagram.com",
+        "auth_cookie_names": ["sessionid"],
+        "min_login_seconds": 8,
     },
     "facebook": {
         "name": "Facebook",
@@ -52,6 +55,8 @@ PLATFORMS = {
         "check_url": "https://www.facebook.com/",
         "icon": "📘",
         "cookie_domain": ".facebook.com",
+        "auth_cookie_names": ["c_user"],
+        "min_login_seconds": 8,
     },
 }
 
@@ -73,6 +78,14 @@ def _matching_cookies(cookies: list[dict], cookie_domain: str) -> list[dict]:
         if domain == normalized or domain.endswith(f".{normalized}"):
             matches.append(cookie)
     return matches
+
+
+def _has_auth_cookie(cookies: list[dict], cookie_names: list[str] | None) -> bool:
+    """Check whether cookies contain a likely authenticated session cookie."""
+    if not cookie_names:
+        return bool(cookies)
+    names = {str(cookie.get("name", "")).lower() for cookie in cookies}
+    return any(name.lower() in names for name in cookie_names)
 
 
 def _playwright_marker(browser: str = "chromium") -> Path:
@@ -121,21 +134,24 @@ def get_session_status(platform: str) -> dict:
         cookies = data.get("cookies", [])
         saved_at = data.get("saved_at", "unknown")
         cookie_count = len(cookies)
+        platform_cookies = _matching_cookies(cookies, PLATFORMS[platform]["cookie_domain"])
+        has_auth_cookie = _has_auth_cookie(platform_cookies, PLATFORMS[platform].get("auth_cookie_names"))
 
         # Check for session cookies (non-expired)
         has_session = any(
             c.get("expires", 0) == -1 or c.get("expires", 0) > time.time()
-            for c in cookies
+            for c in platform_cookies
         )
 
         return {
             "platform": platform,
-            "status": "logged_in" if has_session else "expired",
+            "status": "logged_in" if has_session and has_auth_cookie else "expired",
             "icon": PLATFORMS[platform]["icon"],
             "name": PLATFORMS[platform]["name"],
             "saved_at": saved_at,
             "cookie_count": cookie_count,
             "has_session": has_session,
+            "has_auth_cookie": has_auth_cookie,
         }
     except Exception as e:
         return {"platform": platform, "status": "error", "error": str(e)}
@@ -174,6 +190,57 @@ def load_cookies(platform: str) -> list[dict] | None:
         return data.get("cookies")
     except Exception:
         return None
+
+
+async def verify_session(platform: str) -> dict:
+    """Verify that saved cookies still produce an authenticated session."""
+    config = _platform_config(platform)
+    if not config:
+        return {"platform": platform, "success": False, "error": "Unknown platform"}
+
+    cookies = load_cookies(platform)
+    if not cookies:
+        return {"platform": platform, "success": False, "status": "not_logged_in", "error": "No saved cookies"}
+
+    try:
+        from playwright.async_api import async_playwright
+    except ImportError:
+        return {"platform": platform, "success": False, "error": "Playwright is not installed in this environment."}
+
+    ensure_result = ensure_playwright_browser("chromium")
+    if not ensure_result.get("success"):
+        return {"platform": platform, "success": False, "error": ensure_result.get("error", "Chromium install failed")}
+
+    browser = None
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            context = await browser.new_context()
+            await context.add_cookies(cookies)
+            page = await context.new_page()
+            await page.goto(config["check_url"], wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(2000)
+            current_url = page.url.lower()
+            on_login_page = any(token in current_url for token in ("login", "checkpoint", "challenge"))
+            current_cookies = await context.cookies()
+            platform_cookies = _matching_cookies(current_cookies, config["cookie_domain"])
+            has_auth_cookie = _has_auth_cookie(platform_cookies, config.get("auth_cookie_names"))
+            success = has_auth_cookie and not on_login_page
+            return {
+                "platform": platform,
+                "success": success,
+                "status": "logged_in" if success else "expired",
+                "checked_url": page.url,
+                "cookie_count": len(platform_cookies),
+            }
+    except Exception as e:
+        return {"platform": platform, "success": False, "status": "error", "error": str(e)}
+    finally:
+        if browser is not None:
+            try:
+                await browser.close()
+            except Exception:
+                pass
 
 
 def delete_session(platform: str) -> bool:
@@ -276,6 +343,7 @@ async def start_interactive_login(platform: str, timeout_seconds: int = 300) -> 
             await page.goto(config["login_url"], wait_until="domcontentloaded")
 
             deadline = time.time() + timeout_seconds
+            min_login_time = time.time() + config.get("min_login_seconds", 0)
             while time.time() < deadline:
                 await page.wait_for_timeout(1500)
                 cookies = await context.cookies()
@@ -283,8 +351,9 @@ async def start_interactive_login(platform: str, timeout_seconds: int = 300) -> 
                 current_url = page.url
                 on_login_page = any(token in current_url.lower() for token in ("login", "checkpoint", "challenge"))
                 reached_target = current_url.startswith(config["check_url"])
+                has_auth_cookie = _has_auth_cookie(platform_cookies, config.get("auth_cookie_names"))
 
-                if platform_cookies and (reached_target or not on_login_page):
+                if time.time() >= min_login_time and has_auth_cookie and (reached_target or not on_login_page):
                     save_cookies(platform, platform_cookies)
                     return {
                         "platform": platform,

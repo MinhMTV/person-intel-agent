@@ -21,19 +21,24 @@ class LinkedInScraper:
 
     def __init__(self, headless: bool = True):
         self.headless = headless
+        self._pw_cm = None
         self._pw = None
         self._browser = None
 
     async def __aenter__(self):
         from playwright.async_api import async_playwright
-        self._pw = await async_playwright().__aenter__()
+        self._pw_cm = async_playwright()
+        self._pw = await self._pw_cm.__aenter__()
         return self
 
     async def __aexit__(self, *args):
         if self._browser:
             await self._browser.close()
-        if self._pw:
-            await self._pw.__aexit__(*args)
+        if self._pw_cm:
+            await self._pw_cm.__aexit__(*args)
+        self._pw = None
+        self._pw_cm = None
+        self._browser = None
 
     async def login_and_save_cookies(self) -> bool:
         """Open browser for manual login, then save cookies."""
@@ -67,7 +72,8 @@ class LinkedInScraper:
         """Create a browser context with saved cookies."""
         from playwright.async_api import async_playwright
         if not self._pw:
-            self._pw = await async_playwright().__aenter__()
+            self._pw_cm = async_playwright()
+            self._pw = await self._pw_cm.__aenter__()
 
         self._browser = await self._pw.chromium.launch(headless=self.headless)
         context = await self._browser.new_context(
@@ -197,19 +203,24 @@ class XingScraper:
 
     def __init__(self, headless: bool = True):
         self.headless = headless
+        self._pw_cm = None
         self._pw = None
         self._browser = None
 
     async def __aenter__(self):
         from playwright.async_api import async_playwright
-        self._pw = await async_playwright().__aenter__()
+        self._pw_cm = async_playwright()
+        self._pw = await self._pw_cm.__aenter__()
         return self
 
     async def __aexit__(self, *args):
         if self._browser:
             await self._browser.close()
-        if self._pw:
-            await self._pw.__aexit__(*args)
+        if self._pw_cm:
+            await self._pw_cm.__aexit__(*args)
+        self._pw = None
+        self._pw_cm = None
+        self._browser = None
 
     async def login_and_save_cookies(self) -> bool:
         """Open browser for manual login, then save cookies."""
@@ -220,7 +231,7 @@ class XingScraper:
             page = await context.new_page()
 
             print("🔗 Opening Xing login page...")
-            await page.goto("https://www.xing.com/login", wait_until="networkidle")
+            await page.goto("https://login.xing.com/", wait_until="networkidle")
             print("👆 Please log in manually in the browser window.")
             print("   Press Enter here after you've logged in...")
 
@@ -241,7 +252,8 @@ class XingScraper:
         """Create a browser context with saved cookies."""
         from playwright.async_api import async_playwright
         if not self._pw:
-            self._pw = await async_playwright().__aenter__()
+            self._pw_cm = async_playwright()
+            self._pw = await self._pw_cm.__aenter__()
 
         self._browser = await self._pw.chromium.launch(headless=self.headless)
         context = await self._browser.new_context(
@@ -334,50 +346,55 @@ class ProfessionalScanner:
     async def scan(self, query: PersonQuery) -> list:
         """Search both platforms and return results."""
         results = []
+        selected_platforms = set(p.lower() for p in query.include_platforms or [])
 
         # LinkedIn
-        try:
-            async with self.linkedin:
-                li_profiles = await self.linkedin.search_profiles(query)
-                for url, name, headline, img_url in li_profiles:
-                    results.append(SocialProfile(
-                        platform="linkedin",
-                        url=url,
-                        display_name=name,
-                        bio=headline,
-                        confidence=Confidence.MEDIUM,
-                    ))
-                    if img_url:
-                        results.append(ImageMatch(
-                            source_url=url,
-                            image_url=img_url,
-                            similarity_score=0.0,  # Will be scored by face recognition
-                            context=f"LinkedIn: {name}",
+        if not selected_platforms or "linkedin" in selected_platforms:
+            try:
+                async with self.linkedin:
+                    li_profiles = await self.linkedin.search_profiles(query)
+                    for url, name, headline, img_url in li_profiles:
+                        results.append(SocialProfile(
+                            platform="linkedin",
+                            url=url,
+                            display_name=name,
+                            image_url=img_url or None,
+                            bio=headline,
+                            confidence=Confidence.MEDIUM,
                         ))
-        except Exception as e:
-            print(f"LinkedIn error: {e}")
+                        if img_url:
+                            results.append(ImageMatch(
+                                source_url=url,
+                                image_url=img_url,
+                                similarity_score=0.0,  # Will be scored by face recognition
+                                context=f"LinkedIn: {name}",
+                            ))
+            except Exception as e:
+                print(f"LinkedIn error: {e}")
 
         # Xing
-        try:
-            async with self.xing:
-                xing_profiles = await self.xing.search_profiles(query)
-                for url, name, headline, img_url in xing_profiles:
-                    results.append(SocialProfile(
-                        platform="xing",
-                        url=url,
-                        display_name=name,
-                        bio=headline,
-                        confidence=Confidence.MEDIUM,
-                    ))
-                    if img_url:
-                        results.append(ImageMatch(
-                            source_url=url,
-                            image_url=img_url,
-                            similarity_score=0.0,
-                            context=f"Xing: {name}",
+        if not selected_platforms or "xing" in selected_platforms:
+            try:
+                async with self.xing:
+                    xing_profiles = await self.xing.search_profiles(query)
+                    for url, name, headline, img_url in xing_profiles:
+                        results.append(SocialProfile(
+                            platform="xing",
+                            url=url,
+                            display_name=name,
+                            image_url=img_url or None,
+                            bio=headline,
+                            confidence=Confidence.MEDIUM,
                         ))
-        except Exception as e:
-            print(f"Xing error: {e}")
+                        if img_url:
+                            results.append(ImageMatch(
+                                source_url=url,
+                                image_url=img_url,
+                                similarity_score=0.0,
+                                context=f"Xing: {name}",
+                            ))
+            except Exception as e:
+                print(f"Xing error: {e}")
 
         return results
 
