@@ -908,6 +908,19 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
         }
     }
 
+    async function copyAllUrls() {
+        const d = await fetch(`/api/dossier/${currentDossierId}`).then(r => r.json()).then(j => j.dossier);
+        if (!d) return;
+        const urls = [
+            ...d.social_profiles.map(p => p.url),
+            ...d.web_results.map(r => r.url),
+            ...d.professional.map(p => p.url),
+        ].filter(Boolean);
+        if (!urls.length) { showToast('No URLs found', 'warning'); return; }
+        await navigator.clipboard.writeText([...new Set(urls)].join('\n'));
+        showToast(`📋 ${urls.length} URLs copied`, 'success', 3000);
+    }
+
     async function copyDossierCsv() {
         try {
             const resp = await fetch(`/api/dossier/${currentDossierId}/download?fmt=csv`);
@@ -1148,6 +1161,7 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                        class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">⬇ Markdown</a>
                     <button onclick="copyDossierMarkdown('${data.id}')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📋 Copy</button>
                     <button onclick="copyDossierCsv()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📊 CSV</button>
+                    <button onclick="copyAllUrls()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">🔗 All URLs</button>
                 </div>
             </div>
 
