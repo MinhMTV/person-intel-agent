@@ -908,6 +908,23 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
         }
     }
 
+    async function copyDossierSummary() {
+        const d = await fetch(`/api/dossier/${currentDossierId}`).then(r => r.json()).then(j => j.dossier);
+        if (!d) return;
+        const lines = [
+            `Dossier: ${d.query?.full_name || 'Unknown'}`,
+            `Confidence: ${(d.confidence_score * 100).toFixed(0)}%`,
+            `Social: ${d.social_profiles?.length || 0} profiles`,
+            `Web: ${d.web_results?.length || 0} results`,
+            `Images: ${d.image_matches?.length || 0} matches`,
+            `Emails: ${d.email_addresses?.length || 0} addresses`,
+            `Professional: ${d.professional?.length || 0} results`,
+            `Scanners: ${(d.scanners_used || []).join(', ')}`,
+        ];
+        await navigator.clipboard.writeText(lines.join('\n'));
+        showToast('📋 Dossier summary copied', 'success', 3000);
+    }
+
     async function copyAllUrls() {
         const d = await fetch(`/api/dossier/${currentDossierId}`).then(r => r.json()).then(j => j.dossier);
         if (!d) return;
@@ -1162,6 +1179,7 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                     <button onclick="copyDossierMarkdown('${data.id}')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📋 Copy</button>
                     <button onclick="copyDossierCsv()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📊 CSV</button>
                     <button onclick="copyAllUrls()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">🔗 All URLs</button>
+                    <button onclick="copyDossierSummary()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📝 Summary</button>
                 </div>
             </div>
 
