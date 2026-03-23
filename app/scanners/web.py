@@ -134,6 +134,24 @@ class WebScanner(BaseScanner):
 
         return variants
 
+    def location_queries(self, query: PersonQuery) -> list[str]:
+        """Generate location-enhanced search queries."""
+        if not query.locations:
+            return []
+        
+        queries = []
+        name = f'"{query.full_name}"'
+        
+        for loc in query.locations:
+            if loc.city:
+                queries.append(f"{name} {loc.city}")
+            if loc.country:
+                queries.append(f"{name} {loc.country}")
+            if loc.city and loc.country:
+                queries.append(f"{name} {loc.city} {loc.country}")
+        
+        return queries
+
     # ------------------------------------------------------------------
     # DuckDuckGo
     # ------------------------------------------------------------------
