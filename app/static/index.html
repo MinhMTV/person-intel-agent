@@ -908,6 +908,15 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
         }
     }
 
+    async function copyDossierJson() {
+        try {
+            const resp = await fetch(`/api/dossier/${currentDossierId}`);
+            const data = await resp.json();
+            await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+            showToast('📋 Dossier JSON copied to clipboard', 'success', 3000);
+        } catch (e) { showToast('Copy failed: ' + e.message, 'error'); }
+    }
+
     async function copyDossierSummary() {
         const d = await fetch(`/api/dossier/${currentDossierId}`).then(r => r.json()).then(j => j.dossier);
         if (!d) return;
@@ -1180,6 +1189,7 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                     <button onclick="copyDossierCsv()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📊 CSV</button>
                     <button onclick="copyAllUrls()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">🔗 All URLs</button>
                     <button onclick="copyDossierSummary()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">📝 Summary</button>
+                    <button onclick="copyDossierJson()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">{ } JSON</button>
                 </div>
             </div>
 
