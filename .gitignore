@@ -4,3 +4,5 @@ __pycache__/
 output/
 test_data/
 *.egg-info/
+__pycache__/
+*.pyc
