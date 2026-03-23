@@ -81,7 +81,15 @@ _activity_log: list[dict] = []  # Activity log (max 200)
 async def index():
     """Serve the main search interface."""
     html_path = STATIC_DIR / "index.html"
-    return HTMLResponse(content=html_path.read_text(), status_code=200)
+    return HTMLResponse(
+        content=html_path.read_text(),
+        status_code=200,
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
