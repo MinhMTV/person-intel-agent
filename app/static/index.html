@@ -1315,6 +1315,7 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                 <div class="text-right">
                     <div class="text-lg font-bold ${m.similarity_score > 0.8 ? 'text-green-400' : m.similarity_score > 0.6 ? 'text-amber-400' : 'text-slate-400'}">${(m.similarity_score * 100).toFixed(0)}%</div>
                     <div class="text-xs text-slate-600">similarity</div>
+                    <button onclick="copyProfileJson(this, '${escHtml(JSON.stringify(m))}')" class="mt-1 text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 transition" title="Copy as JSON">📋</button>
                 </div>
             </div>`).join('')}</div>`;
     }
