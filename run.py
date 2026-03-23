@@ -17,6 +17,8 @@ import time
 import webbrowser
 from pathlib import Path
 
+from app.login_manager import ensure_playwright_browser
+
 def check_venv():
     """Prüft ob venv existiert und aktiviert ist."""
     venv_path = Path(__file__).parent / ".venv"
@@ -47,6 +49,21 @@ def install_deps():
             check=True
         )
         print("✅ Dependencies installiert!")
+
+
+def ensure_browser_binaries():
+    """Install Playwright Chromium automatically if needed."""
+    print("🌐 Prüfe Playwright Browser...")
+    result = ensure_playwright_browser("chromium")
+    if not result.get("success"):
+        print("⚠️ Playwright Chromium konnte nicht automatisch installiert werden.")
+        print(result.get("error", "Unknown error"))
+        return False
+    if result.get("installed"):
+        print("✅ Playwright Chromium installiert!")
+    else:
+        print("✅ Playwright Chromium bereit.")
+    return True
 
 def start_webapp(port: int, open_browser: bool):
     """Startet die Webapp."""
@@ -91,10 +108,12 @@ def main():
     
     if args.install:
         install_deps()
+        ensure_browser_binaries()
         print("✅ Fertig! Starte mit: python run.py")
         return
-    
+
     install_deps()
+    ensure_browser_binaries()
     start_webapp(args.port, not args.no_browser)
 
 if __name__ == "__main__":

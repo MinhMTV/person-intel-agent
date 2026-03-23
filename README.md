@@ -92,6 +92,10 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
+# Playwright Chromium wird von run.py automatisch installiert,
+# falls es noch fehlt. Manuell nur bei Bedarf:
+# python -m playwright install chromium
+
 # Tools installieren
 pip install sherlock-project maigret theHarvester
 

@@ -10,13 +10,18 @@ Supports:
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 import time
 from datetime import datetime
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
 _SESSIONS_DIR = Path("/tmp/pia_sessions")
 _SESSIONS_DIR.mkdir(exist_ok=True)
+_PLAYWRIGHT_MARKER_DIR = _SESSIONS_DIR / "playwright"
+_PLAYWRIGHT_MARKER_DIR.mkdir(exist_ok=True)
 
 # Platform configs
 PLATFORMS = {
@@ -68,6 +73,38 @@ def _matching_cookies(cookies: list[dict], cookie_domain: str) -> list[dict]:
         if domain == normalized or domain.endswith(f".{normalized}"):
             matches.append(cookie)
     return matches
+
+
+def _playwright_marker(browser: str = "chromium") -> Path:
+    try:
+        pw_version = version("playwright")
+    except PackageNotFoundError:
+        pw_version = "missing"
+    return _PLAYWRIGHT_MARKER_DIR / f"{browser}-{pw_version}.ok"
+
+
+def ensure_playwright_browser(browser: str = "chromium", force: bool = False) -> dict:
+    """Ensure the requested Playwright browser binary is installed."""
+    marker = _playwright_marker(browser)
+    if marker.exists() and not force:
+        return {"success": True, "browser": browser, "cached": True}
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "playwright", "install", browser],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except Exception as e:
+        return {"success": False, "browser": browser, "error": str(e)}
+
+    if result.returncode != 0:
+        error = (result.stderr or result.stdout or "").strip()
+        return {"success": False, "browser": browser, "error": error or f"Failed to install {browser}"}
+
+    marker.write_text(datetime.utcnow().isoformat() + "Z")
+    return {"success": True, "browser": browser, "installed": True}
 
 
 def get_session_status(platform: str) -> dict:
@@ -157,7 +194,7 @@ def get_login_instructions(platform: str) -> dict:
     try:
         import playwright  # noqa: F401
     except ImportError:
-        return {"error": "Playwright not installed. Run: pip install playwright && playwright install chromium"}
+        return {"error": "Playwright is not installed in this environment."}
 
     return {
         "platform": platform,
@@ -204,13 +241,36 @@ async def start_interactive_login(platform: str, timeout_seconds: int = 300) -> 
         return {
             "platform": platform,
             "success": False,
-            "error": "Playwright not installed. Run: pip install playwright && playwright install chromium",
+            "error": "Playwright is not installed in this environment.",
+        }
+
+    ensure_result = ensure_playwright_browser("chromium")
+    if not ensure_result.get("success"):
+        return {
+            "platform": platform,
+            "success": False,
+            "name": config["name"],
+            "error": f"Could not install Playwright Chromium automatically: {ensure_result['error']}",
         }
 
     browser = None
     try:
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=False)
+            try:
+                browser = await p.chromium.launch(headless=False)
+            except Exception as e:
+                if "Executable doesn't exist" in str(e):
+                    retry_result = ensure_playwright_browser("chromium", force=True)
+                    if not retry_result.get("success"):
+                        return {
+                            "platform": platform,
+                            "success": False,
+                            "name": config["name"],
+                            "error": f"Chromium is missing and auto-install failed: {retry_result['error']}",
+                        }
+                    browser = await p.chromium.launch(headless=False)
+                else:
+                    raise
             context = await browser.new_context()
             page = await context.new_page()
             await page.goto(config["login_url"], wait_until="domcontentloaded")
