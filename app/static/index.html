@@ -400,22 +400,33 @@
                 return;
             }
 
-            container.innerHTML = data.history.map(h => `
+            container.innerHTML = data.history.map(h => {
+                const confPct = h.confidence ? `${(h.confidence * 100).toFixed(0)}%` : '';
+                const confColor = h.confidence > 0.7 ? 'text-green-400' : h.confidence > 0.4 ? 'text-amber-400' : 'text-slate-500';
+                const topPlatform = h.top_platform || '';
+                const totalResults = h.results ? (h.results.social_profiles + h.results.web_results + h.results.image_matches + h.results.email_addresses) : 0;
+
+                return `
                 <div class="flex items-center gap-4 p-3 bg-slate-900 border border-slate-800 rounded-xl hover:border-slate-700 transition cursor-pointer"
                      onclick="loadDossier('${h.id}')">
                     <div class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-sm font-bold">
                         ${escHtml(h.name?.[0] || '?')}
                     </div>
                     <div class="flex-1 min-w-0">
-                        <div class="font-medium text-slate-200">${escHtml(h.name)}</div>
+                        <div class="font-medium text-slate-200 flex items-center gap-2">
+                            ${escHtml(h.name)}
+                            ${topPlatform ? `<span class="text-xs px-1.5 py-0.5 rounded bg-slate-800">${escHtml(topPlatform)}</span>` : ''}
+                        </div>
                         <div class="text-xs text-slate-500">${formatTime(h.timestamp)}</div>
                     </div>
                     <div class="flex gap-2 text-xs">
+                        ${confPct ? `<span class="${confColor} font-bold">${confPct}</span>` : ''}
                         ${h.results?.social_profiles ? `<span class="px-2 py-0.5 rounded bg-blue-900/50 text-blue-300">${h.results.social_profiles} social</span>` : ''}
                         ${h.results?.web_results ? `<span class="px-2 py-0.5 rounded bg-green-900/50 text-green-300">${h.results.web_results} web</span>` : ''}
+                        ${totalResults ? `<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400">${totalResults} total</span>` : ''}
                     </div>
-                </div>
-            `).join('');
+                </div>`;
+            }).join('');
         } catch (e) {
             console.error('Failed to load history:', e);
         }

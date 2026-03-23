@@ -182,8 +182,28 @@ async def api_dossier(dossier_id: str):
 
 @app.get("/api/history")
 async def api_history(limit: int = 20):
-    """Return search history."""
-    return {"history": _search_history[:limit]}
+    """Return search history with dossier summaries."""
+    enriched = []
+    for entry in _search_history[:limit]:
+        dossier_id = entry.get("id")
+        dossier = _dossiers.get(dossier_id) if dossier_id else None
+        enriched_entry = dict(entry)
+        if dossier:
+            enriched_entry["confidence"] = dossier.confidence_score
+            enriched_entry["results"] = {
+                "social_profiles": len(dossier.social_profiles),
+                "web_results": len(dossier.web_results),
+                "image_matches": len(dossier.image_matches),
+                "email_addresses": len(dossier.email_addresses),
+                "professional": len(dossier.professional),
+            }
+            enriched_entry["scanners_used"] = dossier.scanners_used
+            # Best social profile
+            if dossier.social_profiles:
+                best = max(dossier.social_profiles, key=lambda p: 1 if p.confidence.value == "high" else 0)
+                enriched_entry["top_platform"] = best.platform
+        enriched.append(enriched_entry)
+    return {"history": enriched}
 
 
 @app.get("/api/history/export")
