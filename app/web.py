@@ -219,6 +219,17 @@ async def api_pin_search(dossier_id: str):
     raise HTTPException(status_code=404, detail="Search not found")
 
 
+@app.post("/api/history/notes/{dossier_id}")
+async def api_add_notes(dossier_id: str, body: dict = Body(...)):
+    """Add/update notes for a search."""
+    notes = body.get("notes", "")
+    for entry in _search_history:
+        if entry.get("id") == dossier_id:
+            entry["notes"] = notes
+            return {"id": dossier_id, "notes": notes}
+    raise HTTPException(status_code=404, detail="Search not found")
+
+
 @app.get("/api/history/export")
 async def api_history_export(fmt: str = "json"):
     """Export search history as JSON or CSV."""
