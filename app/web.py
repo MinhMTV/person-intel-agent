@@ -327,6 +327,35 @@ async def api_history_export(fmt: str = "json"):
         )
 
 
+@app.get("/api/dossiers/search")
+async def api_dossier_search(q: str = "", limit: int = 20):
+    """Full-text search across all dossier results."""
+    if not q or len(q) < 2:
+        return {"results": [], "query": q}
+    q_lower = q.lower()
+    hits = []
+    for did, d in _dossiers.items():
+        matches = []
+        for sp in d.social_profiles:
+            if q_lower in sp.platform.lower() or q_lower in (sp.url or "").lower():
+                matches.append({"type": "social", "platform": sp.platform, "url": sp.url})
+        for wr in d.web_results:
+            if q_lower in wr.title.lower() or q_lower in wr.url.lower() or q_lower in (wr.snippet or "").lower():
+                matches.append({"type": "web", "title": wr.title, "url": wr.url})
+        for em in d.email_addresses:
+            if q_lower in em.email.lower():
+                matches.append({"type": "email", "email": em.email})
+        for pr in d.professional:
+            if q_lower in pr.platform.lower() or q_lower in (pr.title or "").lower():
+                matches.append({"type": "professional", "platform": pr.platform, "title": pr.title})
+        if q_lower in d.query.full_name.lower():
+            matches.insert(0, {"type": "name", "name": d.query.full_name})
+        if matches:
+            hits.append({"dossier_id": did, "name": d.query.full_name, "confidence": d.confidence_score, "matches": matches[:5]})
+    hits.sort(key=lambda h: h["confidence"], reverse=True)
+    return {"results": hits[:limit], "query": q, "total_hits": len(hits)}
+
+
 @app.get("/api/dossiers/export-all")
 async def api_export_all(fmt: str = "json"):
     """Export all dossiers as a single JSON or concatenated Markdown."""
