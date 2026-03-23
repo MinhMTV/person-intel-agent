@@ -109,7 +109,12 @@
 
         <!-- Search Form -->
         <section class="mb-8" id="search-section">
-            <h2 class="text-lg font-semibold mb-4 text-slate-300">New Search</h2>
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold text-slate-300">New Search</h2>
+                <select id="templateSelector" onchange="applyTemplate(this.value)" class="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:outline-none focus:border-blue-500">
+                    <option value="">-- Search Template --</option>
+                </select>
+            </div>
             <form id="searchForm"
                   hx-post="/api/search"
                   hx-encoding="multipart/form-data"
@@ -542,6 +547,28 @@
     loadHistory();
     loadDashboard();
     loadScanners();
+    loadTemplates();
+
+    async function loadTemplates() {
+        try {
+            const resp = await fetch('/api/templates');
+            const data = await resp.json();
+            const sel = document.getElementById('templateSelector');
+            sel.innerHTML = '<option value="">-- Search Template --</option>';
+            data.templates.forEach(t => {
+                sel.innerHTML += `<option value="${t.id}" title="${escHtml(t.description)}">${escHtml(t.name)}</option>`;
+            });
+        } catch (e) { console.error('Template load error:', e); }
+    }
+
+    function applyTemplate(id) {
+        if (!id) return;
+        fetch('/api/templates').then(r => r.json()).then(data => {
+            const t = data.templates.find(x => x.id === id);
+            if (!t) return;
+            showToast(`Template "${t.name}" selected: ${t.description}`, 'info', 3000);
+        });
+    }
 
     async function loadScanners() {
         try {
