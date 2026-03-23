@@ -309,6 +309,24 @@ async def api_cache_clear(body: dict = Body(default={})):
     return {"cleared": cleared}
 
 
+@app.get("/api/dossier/{dossier_id}/risk")
+async def api_dossier_risk(dossier_id: str):
+    """Calculate risk score for a dossier."""
+    dossier = _dossiers.get(dossier_id)
+    if not dossier:
+        raise HTTPException(status_code=404, detail="Dossier not found")
+    from app.analysis.risk_score import calculate_risk_score
+    risk = calculate_risk_score(dossier.model_dump())
+    return {
+        "dossier_id": dossier_id,
+        "name": dossier.query.full_name,
+        "score": risk.score,
+        "level": risk.level,
+        "factors": risk.factors,
+        "recommendations": risk.recommendations,
+    }
+
+
 @app.get("/api/dossier/{dossier_id}/diff/{other_id}")
 async def api_dossier_diff(dossier_id: str, other_id: str):
     """Compare two dossiers and show differences."""
