@@ -20,6 +20,21 @@
         @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.4} }
         .pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
         .drop-zone.drag-over { border-color: #3b82f6; background-color: rgba(59,130,246,.1); }
+
+        /* Light theme */
+        .light-theme { background: #f8fafc !important; color: #1e293b !important; }
+        .light-theme header, .light-theme .bg-slate-900 { background: #ffffff !important; border-color: #e2e8f0 !important; }
+        .light-theme .bg-slate-800 { background: #f1f5f9 !important; }
+        .light-theme .bg-slate-700 { background: #e2e8f0 !important; }
+        .light-theme .text-slate-100 { color: #0f172a !important; }
+        .light-theme .text-slate-200 { color: #1e293b !important; }
+        .light-theme .text-slate-300 { color: #334155 !important; }
+        .light-theme .text-slate-400 { color: #475569 !important; }
+        .light-theme .text-slate-500 { color: #64748b !important; }
+        .light-theme .text-slate-600 { color: #94a3b8 !important; }
+        .light-theme .border-slate-800 { border-color: #e2e8f0 !important; }
+        .light-theme .border-slate-700 { border-color: #cbd5e1 !important; }
+        .light-theme input, .light-theme select { background: #f8fafc !important; color: #0f172a !important; border-color: #cbd5e1 !important; }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen">
@@ -34,10 +49,11 @@
                 <h1 class="text-xl font-bold tracking-tight">Person Intel Agent</h1>
             </div>
             <div class="flex items-center gap-3">
+                <button id="themeToggle" onclick="toggleTheme()" class="text-slate-500 hover:text-slate-300 transition text-xl" title="Toggle theme">🌙</button>
                 <button id="installBtn" class="hidden text-sm px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg transition">
                     Install App
                 </button>
-                <span class="text-xs text-slate-500">v0.2.0</span>
+                <span class="text-xs text-slate-500">v0.4.0</span>
             </div>
         </div>
     </header>
@@ -1148,6 +1164,38 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/static/sw.js').catch(() => {});
     }
+
+    // =====================================================================
+    // Dark / Light Theme Toggle
+    // =====================================================================
+    function toggleTheme() {
+        const body = document.body;
+        const isDark = body.classList.contains('dark-theme') || !body.classList.contains('light-theme');
+
+        if (isDark) {
+            body.classList.remove('dark-theme');
+            body.classList.add('light-theme');
+            localStorage.setItem('theme', 'light');
+            document.getElementById('themeToggle').textContent = '☀️';
+        } else {
+            body.classList.remove('light-theme');
+            body.classList.add('dark-theme');
+            localStorage.setItem('theme', 'dark');
+            document.getElementById('themeToggle').textContent = '🌙';
+        }
+    }
+
+    // Load saved theme
+    (function() {
+        const saved = localStorage.getItem('theme');
+        const btn = document.getElementById('themeToggle');
+        if (saved === 'light') {
+            document.body.classList.add('light-theme');
+            if (btn) btn.textContent = '☀️';
+        } else {
+            document.body.classList.add('dark-theme');
+        }
+    })();
     </script>
 </body>
 </html>
