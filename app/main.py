@@ -101,6 +101,124 @@ def serve(
     )
 
 
+@app.command()
+def face_analyze(
+    image: str = typer.Argument(..., help="Path to image file"),
+    backend: str = typer.Option("deepface", "--backend", "-b", help="Face backend: deepface or dlib"),
+    model: str = typer.Option("ArcFace", "--model", "-m", help="DeepFace model: ArcFace, Facenet, VGG-Face, etc."),
+):
+    """Analyze a face image: quality, age, gender, emotion, embedding."""
+    from app.scanners.face_engine import FaceEngine
+
+    engine = FaceEngine(backend=backend, model=model)
+
+    console.print(f"\n🔍 Analyzing: [bold]{image}[/bold]")
+    console.print(f"   Backend: {backend}/{model}\n")
+
+    # Quality assessment
+    quality = engine.assess_quality(image)
+    console.print(f"[bold cyan]📊 Quality Assessment[/bold cyan]")
+    console.print(f"  Grade:       {quality.quality_grade} ({quality.quality_score}/100)")
+    console.print(f"  Blur:        {quality.blur_score}/100")
+    console.print(f"  Brightness:  {quality.brightness}")
+    console.print(f"  Contrast:    {quality.contrast}")
+    console.print(f"  Face angle:  {quality.face_angle}°")
+    console.print(f"  Face size:   {quality.face_size_ratio}")
+    console.print(f"  Usable:      {'✅' if quality.is_usable else '❌'}")
+    if quality.issues:
+        console.print(f"  Issues:      {', '.join(quality.issues)}")
+
+    # Full analysis
+    result = engine.analyze(image)
+    console.print(f"\n[bold cyan]👤 Face Analysis[/bold cyan]")
+    console.print(f"  Face detected:  {'✅' if result.face_detected else '❌'}")
+    if result.age_estimate:
+        console.print(f"  Age estimate:   ~{result.age_estimate}")
+    if result.gender:
+        console.print(f"  Gender:         {result.gender}")
+    if result.emotion:
+        console.print(f"  Emotion:        {result.emotion}")
+    if result.embedding is not None:
+        console.print(f"  Embedding dim:  {len(result.embedding)}")
+
+
+@app.command()
+def face_compare(
+    image1: str = typer.Argument(..., help="First image"),
+    image2: str = typer.Argument(..., help="Second image"),
+    backend: str = typer.Option("deepface", "--backend", "-b", help="Face backend: deepface or dlib"),
+    model: str = typer.Option("ArcFace", "--model", "-m", help="DeepFace model"),
+    threshold: float = typer.Option(0.6, "--threshold", "-t", help="Match threshold"),
+):
+    """Compare two face images for similarity."""
+    from app.scanners.face_engine import FaceEngine
+
+    engine = FaceEngine(backend=backend, model=model)
+
+    console.print(f"\n🔍 Comparing faces using {backend}/{model}")
+    console.print(f"  Image 1: {image1}")
+    console.print(f"  Image 2: {image2}\n")
+
+    result = engine.compare(image1, image2, threshold)
+
+    sim = result.get("similarity", 0)
+    is_match = result.get("is_match", False)
+    distance = result.get("distance", "N/A")
+
+    console.print(f"[bold cyan]📊 Results[/bold cyan]")
+    console.print(f"  Similarity:  {sim:.4f} ({sim:.1%})")
+    console.print(f"  Distance:    {distance}")
+    console.print(f"  Match:       {'✅ YES' if is_match else '❌ NO'}")
+    console.print(f"  Backend:     {result.get('backend', 'N/A')}")
+
+    if "error" in result:
+        console.print(f"  [red]Error: {result['error']}[/red]")
+
+
+@app.command()
+def face_batch(
+    reference: str = typer.Argument(..., help="Reference image to compare against"),
+    candidates_dir: str = typer.Argument(..., help="Directory with candidate images"),
+    backend: str = typer.Option("deepface", "--backend", "-b", help="Face backend"),
+    model: str = typer.Option("ArcFace", "--model", "-m", help="DeepFace model"),
+    threshold: float = typer.Option(0.6, "--threshold", "-t", help="Match threshold"),
+):
+    """Batch compare a reference face against all images in a directory."""
+    from app.scanners.face_engine import FaceEngine
+    from pathlib import Path
+
+    engine = FaceEngine(backend=backend, model=model)
+
+    candidates = []
+    for ext in ("*.jpg", "*.jpeg", "*.png", "*.webp"):
+        candidates.extend(Path(candidates_dir).glob(ext))
+
+    if not candidates:
+        console.print(f"[red]No images found in {candidates_dir}[/red]")
+        return
+
+    console.print(f"\n🔍 Batch comparing {len(candidates)} images against reference")
+    console.print(f"  Reference: {reference}")
+    console.print(f"  Backend:   {backend}/{model}\n")
+
+    results = engine.batch_compare(reference, [str(c) for c in candidates], threshold)
+
+    table = Table(title="Face Comparison Results")
+    table.add_column("Match", style="green", width=5)
+    table.add_column("Image", style="cyan")
+    table.add_column("Similarity", style="yellow")
+    table.add_column("Quality", style="blue")
+
+    for r in results:
+        name = Path(r.get("path", "?")).name
+        sim = f"{r.get('similarity', 0):.4f}"
+        is_match = "✅" if r.get("is_match") else "❌"
+        grade = r.get("quality_grade", "?")
+        table.add_row(is_match, name, sim, grade)
+
+    console.print(table)
+
+
 async def _run_scanners(query: PersonQuery, scanner_list: str) -> PersonDossier:
     """Run selected scanners."""
     scanner_map = {

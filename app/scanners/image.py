@@ -1,4 +1,8 @@
-"""Image Similarity Scanner — Face recognition + reverse image search + social profile scraping."""
+"""Image Similarity Scanner — Face recognition + reverse image search + social profile scraping.
+
+Uses DeepFace/ArcFace as primary backend with dlib fallback.
+Includes face quality scoring and demographic estimation.
+"""
 
 from __future__ import annotations
 import asyncio
@@ -14,25 +18,30 @@ from app.models import PersonQuery, ImageMatch, Confidence
 
 
 class ImageScanner:
-    """Find images of a person using face recognition + reverse image search."""
+    """Find images of a person using face recognition + reverse image search.
+
+    Primary backend: DeepFace with ArcFace model (512-d embeddings, higher accuracy)
+    Fallback: face_recognition/dlib (128-d embeddings)
+    """
 
     name = "image"
     description = "Face recognition + reverse image search + social profile scraping"
 
     # Threshold: lower = stricter matching
-    # 0.0 = identical, 0.6 = very similar, 1.0 = completely different
     SIMILARITY_THRESHOLD = 0.6
 
-    def __init__(self):
-        self._fr = None
+    def __init__(self, backend: str = "deepface", model: str = "ArcFace"):
+        self.backend = backend
+        self.model = model
+        self._engine = None
 
     @property
-    def face_recognition(self):
-        """Lazy import face_recognition."""
-        if self._fr is None:
-            import face_recognition as fr
-            self._fr = fr
-        return self._fr
+    def engine(self):
+        """Lazy init face engine."""
+        if self._engine is None:
+            from app.scanners.face_engine import FaceEngine
+            self._engine = FaceEngine(backend=self.backend, model=self.model)
+        return self._engine
 
     async def scan(self, query: PersonQuery) -> list[ImageMatch]:
         """Run image similarity scan."""
@@ -43,13 +52,19 @@ class ImageScanner:
             print(f"⚠️ Photo not found: {query.photo_path}")
             return []
 
-        # Step 1: Encode reference photo
-        reference_encoding = self._encode_face(query.photo_path)
-        if reference_encoding is None:
+        # Step 1: Analyze reference photo quality + encode
+        engine = self.engine
+        analysis = engine.analyze(query.photo_path)
+
+        if not analysis.face_detected:
             print("⚠️ No face found in reference photo")
             return []
 
-        print(f"📸 Reference face encoded from: {query.photo_path}")
+        if analysis.quality:
+            print(f"📸 Reference face quality: {analysis.quality.quality_grade} ({analysis.quality.quality_score}/100)")
+        if analysis.age_estimate:
+            print(f"👤 Estimated age: {analysis.age_estimate}, gender: {analysis.gender}")
+        print(f"🧠 Using {analysis.backend}/{analysis.model} ({len(analysis.embedding)}d embedding)")
 
         # Step 2: Find candidate images from multiple sources
         candidate_images = await self._find_candidate_images(query)
@@ -61,7 +76,7 @@ class ImageScanner:
             for img_url, source_url, context in candidate_images:
                 try:
                     match = await self._check_image(
-                        client, img_url, source_url, context, reference_encoding
+                        client, img_url, source_url, context, query.photo_path
                     )
                     if match:
                         matches.append(match)
@@ -72,19 +87,6 @@ class ImageScanner:
         # Sort by similarity (highest = best match)
         matches.sort(key=lambda m: m.similarity_score, reverse=True)
         return matches
-
-    def _encode_face(self, image_path: str) -> Optional:
-        """Encode a face from an image file into a 128-d vector."""
-        fr = self.face_recognition
-        try:
-            image = fr.load_image_file(image_path)
-            encodings = fr.face_encodings(image)
-            if encodings:
-                return encodings[0]
-            return None
-        except Exception as e:
-            print(f"Error encoding face: {e}")
-            return None
 
     async def _find_candidate_images(self, query: PersonQuery) -> list[tuple[str, str, str]]:
         """Find candidate images from multiple sources.
@@ -303,11 +305,9 @@ class ImageScanner:
         img_url: str,
         source_url: str,
         context: str,
-        reference_encoding,
+        reference_path: str,
     ) -> Optional[ImageMatch]:
-        """Download image, detect faces, compare with reference."""
-        fr = self.face_recognition
-
+        """Download image, detect faces, compare with reference using face engine."""
         # Download image
         resp = await client.get(img_url)
         if resp.status_code != 200:
@@ -319,34 +319,22 @@ class ImageScanner:
             return None
 
         # Save temp file
-        suffix = ".jpg"
-        if "png" in content_type:
-            suffix = ".png"
+        suffix = ".png" if "png" in content_type else ".jpg"
 
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
             tmp.write(resp.content)
             tmp_path = tmp.name
 
         try:
-            # Load and encode faces
-            image = fr.load_image_file(tmp_path)
-            face_encodings = fr.face_encodings(image)
+            # Use face engine for comparison
+            result = self.engine.compare(reference_path, tmp_path, self.SIMILARITY_THRESHOLD)
 
-            if not face_encodings:
-                return None
-
-            # Compare each face in the image with reference
-            best_distance = 1.0
-            for encoding in face_encodings:
-                distance = fr.face_distance([reference_encoding], encoding)[0]
-                best_distance = min(best_distance, distance)
-
-            if best_distance <= self.SIMILARITY_THRESHOLD:
+            if result.get("is_match"):
                 return ImageMatch(
                     source_url=source_url,
                     image_url=img_url,
-                    similarity_score=round(1.0 - best_distance, 3),
-                    context=context,
+                    similarity_score=result.get("similarity", 0),
+                    context=f"{context} [{result.get('backend', '')}]",
                 )
 
             return None

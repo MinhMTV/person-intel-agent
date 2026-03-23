@@ -1,4 +1,7 @@
-"""Advanced Image Scanner — Google Lens + Bing Visual Search via Playwright."""
+"""Advanced Image Scanner — Google Lens + Bing Visual Search via Playwright.
+
+Uses DeepFace/ArcFace for face comparison with dlib fallback.
+"""
 
 from __future__ import annotations
 
@@ -18,7 +21,7 @@ class AdvancedImageScanner:
     """Reverse image search via Google Lens and Bing Visual Search.
 
     Uses Playwright to automate browser-based reverse image search engines,
-    then downloads candidate images and compares them with face_recognition.
+    then downloads candidate images and compares them with DeepFace/ArcFace.
     """
 
     name = "advanced_image"
@@ -26,28 +29,32 @@ class AdvancedImageScanner:
 
     SIMILARITY_THRESHOLD = 0.6
 
-    def __init__(self):
-        self._fr = None
+    def __init__(self, backend: str = "deepface", model: str = "ArcFace"):
+        self.backend = backend
+        self.model = model
+        self._engine = None
 
     @property
-    def face_recognition(self):
-        """Lazy import face_recognition."""
-        if self._fr is None:
-            import face_recognition as fr
-            self._fr = fr
-        return self._fr
+    def engine(self):
+        """Lazy init face engine."""
+        if self._engine is None:
+            from app.scanners.face_engine import FaceEngine
+            self._engine = FaceEngine(backend=self.backend, model=self.model)
+        return self._engine
 
     async def scan(self, query: PersonQuery) -> list[ImageMatch]:
         """Run advanced image search."""
         if not query.photo_path or not os.path.exists(query.photo_path):
             return []
 
-        reference_encoding = self._encode_face(query.photo_path)
-        if reference_encoding is None:
+        # Analyze reference
+        engine = self.engine
+        analysis = engine.analyze(query.photo_path)
+        if not analysis.face_detected:
             print("⚠️ No face found in reference photo")
             return []
 
-        print(f"📸 [AdvancedImage] Reference face encoded from: {query.photo_path}")
+        print(f"📸 [AdvancedImage] Using {analysis.backend}/{analysis.model} ({len(analysis.embedding) if analysis.embedding is not None else 0}d embedding)")
 
         # Collect candidates from reverse search engines
         candidates: list[tuple[str, str, str]] = []
@@ -63,7 +70,7 @@ class AdvancedImageScanner:
             for img_url, source_url, context in candidates:
                 try:
                     match = await self._check_image(
-                        client, img_url, source_url, context, reference_encoding
+                        client, img_url, source_url, context, query.photo_path
                     )
                     if match:
                         matches.append(match)
@@ -224,27 +231,15 @@ class AdvancedImageScanner:
     # Utilities
     # ==================================================================
 
-    def _encode_face(self, image_path: str) -> Optional:
-        """Encode a face from an image file into a 128-d vector."""
-        fr = self.face_recognition
-        try:
-            image = fr.load_image_file(image_path)
-            encodings = fr.face_encodings(image)
-            return encodings[0] if encodings else None
-        except Exception as e:
-            print(f"Error encoding face: {e}")
-            return None
-
     async def _check_image(
         self,
         client: httpx.AsyncClient,
         img_url: str,
         source_url: str,
         context: str,
-        reference_encoding,
+        reference_path: str,
     ) -> Optional[ImageMatch]:
-        """Download image, detect faces, compare with reference."""
-        fr = self.face_recognition
+        """Download image, detect faces, compare with reference using face engine."""
 
         resp = await client.get(img_url)
         if resp.status_code != 200:
@@ -261,23 +256,14 @@ class AdvancedImageScanner:
             tmp_path = tmp.name
 
         try:
-            image = fr.load_image_file(tmp_path)
-            face_encodings = fr.face_encodings(image)
+            result = self.engine.compare(reference_path, tmp_path, self.SIMILARITY_THRESHOLD)
 
-            if not face_encodings:
-                return None
-
-            best_distance = 1.0
-            for encoding in face_encodings:
-                distance = fr.face_distance([reference_encoding], encoding)[0]
-                best_distance = min(best_distance, distance)
-
-            if best_distance <= self.SIMILARITY_THRESHOLD:
+            if result.get("is_match"):
                 return ImageMatch(
                     source_url=source_url,
                     image_url=img_url,
-                    similarity_score=round(1.0 - best_distance, 3),
-                    context=context,
+                    similarity_score=result.get("similarity", 0),
+                    context=f"{context} [{result.get('backend', '')}]",
                 )
 
             return None

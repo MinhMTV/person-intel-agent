@@ -42,7 +42,7 @@ Automatisierte Personenrecherche: Gib einen Namen ein, bekomme ein strukturierte
   - `sherlock` / `maigret` — Username-Suche
   - `theHarvester` — E-Mail/Domain-Harvesting
   - `spiderfoot` — Automatisiertes OSINT
-- **Bildanalyse:** face_recognition (dlib), OpenCV
+- **Bildanalyse:** DeepFace/ArcFace (512-d), face_recognition (dlib 128-d), OpenCV quality scoring
 - **Web Scraping:** BeautifulSoup, httpx
 - **Output:** Markdown → PDF (WeasyPrint)
 - **Optional:** OpenClaw Integration (Skill)
