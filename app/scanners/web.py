@@ -109,11 +109,13 @@ class WebScanner(BaseScanner):
             "youtube": "youtube.com",
         }
         selected_platforms = set(p.lower() for p in query.include_platforms or [])
-        sites = (
-            [platform_sites[p] for p in selected_platforms if p in platform_sites]
-            if selected_platforms
-            else ["linkedin.com", "xing.com", "facebook.com", "twitter.com", "github.com", "instagram.com"]
-        )
+        excluded_platforms = set(p.lower() for p in query.exclude_platforms or [])
+        
+        if selected_platforms:
+            sites = [platform_sites[p] for p in selected_platforms if p in platform_sites]
+        else:
+            sites = [platform_sites[p] for p in platform_sites if p not in excluded_platforms]
+        
         searches.extend([f"{name} site:{site}" for site in sites])
 
         return searches
@@ -185,12 +187,39 @@ class WebScanner(BaseScanner):
             ddgs = DDGS()
             ddg_results = ddgs.text(query, max_results=10)
             for r in ddg_results:
+                url = r.get("href", "")
+                title = r.get("title", "")
+                snippet = r.get("body", "")
+                
+                # Smart confidence based on URL and content
+                confidence = Confidence.LOW
+                url_lower = url.lower()
+                
+                # High confidence: direct profile URLs
+                if any(p in url_lower for p in ["/in/", "/profile/", "linkedin.com/in", "xing.com/profile"]):
+                    confidence = Confidence.HIGH
+                elif any(p in url_lower for p in ["github.com/", "facebook.com/", "instagram.com/"]):
+                    confidence = Confidence.MEDIUM
+                elif any(p in url_lower for p in [".de/", ".com/", ".org/"]):
+                    confidence = Confidence.MEDIUM
+                
+                # Boost if name appears in title/snippet
+                name_parts = query.lower().split()
+                if all(part in (title + snippet).lower() for part in name_parts if len(part) > 2):
+                    confidence = max(confidence, Confidence.MEDIUM)
+                
+                # Try to extract image from URL (for social profiles)
+                image_url = None
+                if any(p in url_lower for p in ["github.com", "linkedin.com", "xing.com", "instagram.com", "facebook.com", "twitter.com"]):
+                    image_url = await self._extract_profile_image(url)
+                
                 results.append(SearchResult(
                     source=Source.WEB,
-                    title=r.get("title", ""),
-                    url=r.get("href", ""),
-                    snippet=r.get("body", ""),
-                    confidence=Confidence.MEDIUM,
+                    title=title,
+                    url=url,
+                    snippet=snippet,
+                    confidence=confidence,
+                    image_url=image_url,
                 ))
         except Exception as e:
             print(f"DDGS error: {e}")
@@ -274,3 +303,47 @@ class WebScanner(BaseScanner):
                 ))
 
         return results
+
+    async def _extract_profile_image(self, url: str) -> str | None:
+        """Extract profile image from social profile URL."""
+        import httpx
+        from bs4 import BeautifulSoup
+        
+        try:
+            async with httpx.AsyncClient(timeout=5, follow_redirects=True) as resp:
+                response = await resp.get(url)
+                if response.status_code != 200:
+                    return None
+                
+                soup = BeautifulSoup(response.text, "html.parser")
+                
+                # Check og:image meta tag
+                meta = soup.select_one("meta[property='og:image']")
+                if meta:
+                    return meta.get("content")
+                
+                # Check twitter:image meta tag
+                meta = soup.select_one("meta[name='twitter:image']")
+                if meta:
+                    return meta.get("content")
+                
+                # Platform-specific selectors
+                if "github.com" in url:
+                    img = soup.select_one("img.avatar-user, img[src*='avatars.githubusercontent.com']")
+                    if img:
+                        return img.get("src")
+                
+                elif "linkedin.com" in url:
+                    img = soup.select_one("img[src*='media.licdn.com']")
+                    if img:
+                        return img.get("src")
+                
+                elif "instagram.com" in url:
+                    img = soup.select_one("img[src*='instagram']")
+                    if img:
+                        return img.get("src")
+                
+        except Exception:
+            pass
+        
+        return None

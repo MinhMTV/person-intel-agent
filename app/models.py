@@ -77,6 +77,7 @@ class PersonQuery(BaseModel):
     locations: list[Location] = Field(default_factory=list)
     countries: list[str] = Field(default_factory=list)
     include_platforms: list[str] = Field(default_factory=list)
+    exclude_platforms: list[str] = Field(default_factory=list)
     include_countries: list[str] = Field(default_factory=list)
     exclude_countries: list[str] = Field(default_factory=list)
     include_continents: list[str] = Field(default_factory=list)

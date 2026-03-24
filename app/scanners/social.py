@@ -105,11 +105,15 @@ class SocialScanner(BaseScanner):
                     resp = await client.get(url)
                     final_url = str(resp.url)
                     if resp.status_code == 200 and username.lower() in final_url.lower():
+                        # Try to extract profile image
+                        image_url = await self._extract_profile_image(client, platform, resp.text, final_url)
+                        
                         return SocialProfile(
                             platform=platform,
                             url=final_url,
                             username=username,
                             confidence=Confidence.MEDIUM,
+                            image_url=image_url,
                         )
                 except Exception:
                     return None
@@ -124,3 +128,70 @@ class SocialScanner(BaseScanner):
                     results.append(item)
 
         return results
+
+    async def _extract_profile_image(self, client, platform: str, html: str, url: str) -> str | None:
+        """Extract profile image URL from platform HTML."""
+        from bs4 import BeautifulSoup
+        
+        try:
+            soup = BeautifulSoup(html, "html.parser")
+            
+            # Platform-specific image selectors
+            if platform == "github":
+                # GitHub avatar
+                img = soup.select_one("img.avatar-user, img[src*='avatars.githubusercontent.com']")
+                if img:
+                    return img.get("src")
+            
+            elif platform == "twitter":
+                # Twitter/X profile image
+                img = soup.select_one("img[src*='pbs.twimg.com/profile_images']")
+                if img:
+                    return img.get("src")
+            
+            elif platform == "instagram":
+                # Instagram profile image (meta tag)
+                meta = soup.select_one("meta[property='og:image']")
+                if meta:
+                    return meta.get("content")
+            
+            elif platform == "linkedin":
+                # LinkedIn profile image (meta tag)
+                meta = soup.select_one("meta[property='og:image']")
+                if meta:
+                    return meta.get("content")
+            
+            elif platform == "facebook":
+                # Facebook profile image
+                meta = soup.select_one("meta[property='og:image']")
+                if meta:
+                    return meta.get("content")
+            
+            elif platform == "reddit":
+                # Reddit avatar
+                img = soup.select_one("img[src*='i.redd.it']")
+                if img:
+                    return img.get("src")
+            
+            elif platform == "xing":
+                # Xing profile image
+                meta = soup.select_one("meta[property='og:image']")
+                if meta:
+                    return meta.get("content")
+            
+            # Fallback: og:image meta tag
+            meta = soup.select_one("meta[property='og:image']")
+            if meta:
+                return meta.get("content")
+            
+            # Fallback: first large image
+            for img in soup.select("img[src]"):
+                src = img.get("src", "")
+                if any(ext in src.lower() for ext in [".jpg", ".jpeg", ".png", ".webp"]):
+                    if any(size in src.lower() for size in ["avatar", "profile", "photo", "picture"]):
+                        return src
+            
+        except Exception:
+            pass
+        
+        return None
