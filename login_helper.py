@@ -13,10 +13,11 @@ Usage:
 import asyncio
 import json
 import sys
+import tempfile
 from pathlib import Path
 
-SESSIONS_DIR = Path("/tmp/pia_sessions")
-SESSIONS_DIR.mkdir(exist_ok=True)
+SESSIONS_DIR = Path(tempfile.gettempdir()) / "pia_sessions"
+SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
 
 PLATFORMS = {
     "linkedin": {

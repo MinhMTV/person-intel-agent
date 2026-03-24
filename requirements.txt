@@ -18,10 +18,10 @@ python-multipart>=0.0.6
 playwright>=1.40
 
 # Image Analysis
-opencv-python-headless>=4.8
+opencv-python-headless>=4.8; python_version < "3.13"
 Pillow>=10.0
-deepface>=0.0.95
-tf-keras>=2.16
+deepface>=0.0.95; python_version < "3.13"
+tf-keras>=2.16; python_version < "3.13"
 
 # Output
 weasyprint>=60.0

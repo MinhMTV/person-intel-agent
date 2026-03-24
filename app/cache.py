@@ -13,6 +13,7 @@ import asyncio
 import hashlib
 import json
 import sqlite3
+import tempfile
 import time
 from datetime import datetime, timedelta
 from functools import wraps
@@ -256,8 +257,8 @@ def get_rate_limiter() -> RateLimiter:
 # =============================================================================
 # Scanner Result Cache (for _run_all_scanners)
 # =============================================================================
-_SCANNER_CACHE_DIR = Path("/tmp/pia_cache")
-_SCANNER_CACHE_DIR.mkdir(exist_ok=True)
+_SCANNER_CACHE_DIR = Path(tempfile.gettempdir()) / "pia_cache"
+_SCANNER_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 _scanner_memory_cache: dict[str, tuple[float, Any]] = {}
 SCANNER_CACHE_TTL = 1800  # 30 minutes
@@ -281,7 +282,7 @@ def get_cached(query_name: str, scanner: str, ttl: int = SCANNER_CACHE_TTL) -> A
         try:
             stat = path.stat()
             if time.time() - stat.st_mtime < ttl:
-                data = json.loads(path.read_text())
+                data = json.loads(path.read_text(encoding="utf-8"))
                 _scanner_memory_cache[key] = (stat.st_mtime, data)
                 return data
         except Exception:
@@ -294,7 +295,7 @@ def set_cached(query_name: str, scanner: str, data: Any) -> None:
     key = _scanner_cache_key(query_name, scanner)
     _scanner_memory_cache[key] = (time.time(), data)
     try:
-        (_SCANNER_CACHE_DIR / f"{key}.json").write_text(json.dumps(data, default=str))
+        (_SCANNER_CACHE_DIR / f"{key}.json").write_text(json.dumps(data, default=str), encoding="utf-8")
     except Exception:
         pass
 

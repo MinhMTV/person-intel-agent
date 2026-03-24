@@ -20,6 +20,16 @@ from pathlib import Path
 
 from app.login_manager import ensure_playwright_browser
 
+
+def configure_stdio() -> None:
+    """Prefer UTF-8 console output when the interpreter supports reconfiguration."""
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(encoding="utf-8", errors="replace")
+
+
 def check_venv():
     """Prüft ob venv existiert und aktiviert ist."""
     venv_path = Path(__file__).parent / ".venv"
@@ -135,6 +145,7 @@ def start_webapp(port: int, open_browser: bool):
         print(f"\n❌ Webapp konnte nicht gestartet werden (exit {e.returncode}).")
 
 def main():
+    configure_stdio()
     parser = argparse.ArgumentParser(description="Person Intel Agent Webapp Starter")
     parser.add_argument("--port", type=int, default=8000, help="Port (default: 8000)")
     parser.add_argument("--no-browser", action="store_true", help="Browser nicht öffnen")

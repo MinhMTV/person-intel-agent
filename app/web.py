@@ -94,7 +94,7 @@ async def index():
     """Serve the main search interface."""
     html_path = STATIC_DIR / "index.html"
     return HTMLResponse(
-        content=html_path.read_text(),
+        content=html_path.read_text(encoding="utf-8"),
         status_code=200,
         headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",

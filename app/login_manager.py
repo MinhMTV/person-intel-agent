@@ -12,16 +12,17 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
-_SESSIONS_DIR = Path("/tmp/pia_sessions")
-_SESSIONS_DIR.mkdir(exist_ok=True)
+_SESSIONS_DIR = Path(tempfile.gettempdir()) / "pia_sessions"
+_SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
 _PLAYWRIGHT_MARKER_DIR = _SESSIONS_DIR / "playwright"
-_PLAYWRIGHT_MARKER_DIR.mkdir(exist_ok=True)
+_PLAYWRIGHT_MARKER_DIR.mkdir(parents=True, exist_ok=True)
 
 # Platform configs
 PLATFORMS = {
@@ -116,7 +117,7 @@ def ensure_playwright_browser(browser: str = "chromium", force: bool = False) ->
         error = (result.stderr or result.stdout or "").strip()
         return {"success": False, "browser": browser, "error": error or f"Failed to install {browser}"}
 
-    marker.write_text(datetime.utcnow().isoformat() + "Z")
+    marker.write_text(datetime.utcnow().isoformat() + "Z", encoding="utf-8")
     return {"success": True, "browser": browser, "installed": True}
 
 
@@ -130,7 +131,7 @@ def get_session_status(platform: str) -> dict:
         return {"platform": platform, "status": "not_logged_in", "icon": PLATFORMS[platform]["icon"]}
 
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         cookies = data.get("cookies", [])
         saved_at = data.get("saved_at", "unknown")
         cookie_count = len(cookies)
@@ -176,7 +177,7 @@ def save_cookies(platform: str, cookies: list[dict]) -> bool:
         "saved_at": datetime.utcnow().isoformat() + "Z",
         "cookie_count": len(cookies),
     }
-    path.write_text(json.dumps(data, indent=2))
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     return True
 
 
@@ -186,7 +187,7 @@ def load_cookies(platform: str) -> list[dict] | None:
     if not path.exists():
         return None
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         return data.get("cookies")
     except Exception:
         return None
@@ -286,7 +287,7 @@ async def login():
         await page.goto('{config["login_url"]}')
         input('Log in and press Enter...')
         cookies = await context.cookies()
-        with open('/tmp/pia_sessions/{platform}.json', 'w') as f:
+        with open(r'{(_SESSIONS_DIR / f"{platform}.json").as_posix()}', 'w') as f:
             json.dump({{"platform": "{platform}", "cookies": cookies, "saved_at": "auto"}}, f, indent=2)
         await browser.close()
         print('✅ {config["name"]} session saved!')

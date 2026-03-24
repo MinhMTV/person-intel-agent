@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+import tempfile
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Awaitable
 
-_SCHEDULE_FILE = Path("/tmp/pia_schedules.json")
+_SCHEDULE_FILE = Path(tempfile.gettempdir()) / "pia_schedules.json"
 _schedules: dict[str, dict] = {}
 _running_tasks: dict[str, asyncio.Task] = {}
 
@@ -18,14 +19,14 @@ def _load_schedules():
     global _schedules
     if _SCHEDULE_FILE.exists():
         try:
-            _schedules = json.loads(_SCHEDULE_FILE.read_text())
+            _schedules = json.loads(_SCHEDULE_FILE.read_text(encoding="utf-8"))
         except Exception:
             _schedules = {}
 
 
 def _save_schedules():
     try:
-        _SCHEDULE_FILE.write_text(json.dumps(_schedules, default=str, indent=2))
+        _SCHEDULE_FILE.write_text(json.dumps(_schedules, default=str, indent=2), encoding="utf-8")
     except Exception:
         pass
 
