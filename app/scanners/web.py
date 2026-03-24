@@ -57,7 +57,16 @@ class WebScanner(BaseScanner):
                 seen_urls.add(r.url)
                 unique.append(r)
 
-        return unique
+        # Filter by name matching
+        from app.analysis.name_matcher import NameMatcher
+        matcher = NameMatcher(query.full_name)
+        filtered = matcher.filter_results(unique)
+
+        # If too few results after filtering, return original
+        if len(filtered) < 3 and len(unique) >= 3:
+            filtered = unique
+
+        return filtered
 
     # ------------------------------------------------------------------
     # Query building
@@ -310,40 +319,71 @@ class WebScanner(BaseScanner):
         from bs4 import BeautifulSoup
         
         try:
-            async with httpx.AsyncClient(timeout=5, follow_redirects=True) as resp:
-                response = await resp.get(url)
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.5",
+                "Accept-Encoding": "gzip, deflate, br",
+                "DNT": "1",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1",
+            }
+            
+            async with httpx.AsyncClient(timeout=8, follow_redirects=True) as resp:
+                response = await resp.get(url, headers=headers)
                 if response.status_code != 200:
                     return None
                 
-                soup = BeautifulSoup(response.text, "html.parser")
+                html = response.text
+                soup = BeautifulSoup(html, "html.parser")
                 
-                # Check og:image meta tag
+                # Check og:image meta tag (works for most platforms)
                 meta = soup.select_one("meta[property='og:image']")
-                if meta:
-                    return meta.get("content")
+                if meta and meta.get("content"):
+                    img_url = meta.get("content")
+                    if img_url and "placeholder" not in img_url.lower():
+                        return img_url
                 
                 # Check twitter:image meta tag
                 meta = soup.select_one("meta[name='twitter:image']")
-                if meta:
+                if meta and meta.get("content"):
                     return meta.get("content")
                 
                 # Platform-specific selectors
                 if "github.com" in url:
-                    img = soup.select_one("img.avatar-user, img[src*='avatars.githubusercontent.com']")
+                    img = soup.select_one("img.avatar-user, img[src*='avatars.githubusercontent.com'], img[alt*='avatar']")
                     if img:
-                        return img.get("src")
+                        src = img.get("src", "")
+                        if "avatars" in src:
+                            return src
                 
                 elif "linkedin.com" in url:
-                    img = soup.select_one("img[src*='media.licdn.com']")
+                    img = soup.select_one("img[src*='media.licdn.com'], img[class*='profile-photo'], img[data-delayed-url*='licdn']")
+                    if img:
+                        return img.get("src") or img.get("data-delayed-url")
+                
+                elif "xing.com" in url:
+                    img = soup.select_one("img[src*='ximg.xingcdn.com'], img[alt*='profile'], img[class*='profile']")
                     if img:
                         return img.get("src")
                 
                 elif "instagram.com" in url:
-                    img = soup.select_one("img[src*='instagram']")
+                    # Instagram blocks most scraping, try og:image first
+                    meta = soup.select_one("meta[property='og:image']")
+                    if meta:
+                        return meta.get("content")
+                
+                elif "facebook.com" in url:
+                    meta = soup.select_one("meta[property='og:image']")
+                    if meta:
+                        return meta.get("content")
+                
+                elif "twitter.com" in url or "x.com" in url:
+                    img = soup.select_one("img[src*='pbs.twimg.com/profile_images']")
                     if img:
                         return img.get("src")
                 
-        except Exception:
+        except Exception as e:
             pass
         
         return None
