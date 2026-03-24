@@ -63,7 +63,8 @@ class TestPersonQuery:
     def test_from_name(self):
         q = PersonQuery(full_name="John Smith")
         assert q.full_name == "John Smith"
-        assert q.first_name is None  # not auto-split
+        assert q.first_name == "John"  # auto-split
+        assert q.last_name == "Smith"  # auto-split
 
     def test_with_details(self):
         q = PersonQuery(

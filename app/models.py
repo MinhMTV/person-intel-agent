@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class Source(str, Enum):
@@ -86,6 +86,18 @@ class PersonQuery(BaseModel):
     photo_path: Optional[str] = None
     age_range: Optional[tuple[int, int]] = None
     language: Optional[str] = None
+
+    @model_validator(mode="after")
+    def split_name(self):
+        """Split full_name into first_name and last_name."""
+        if not self.first_name or not self.last_name:
+            parts = self.full_name.strip().split()
+            if len(parts) >= 2:
+                self.first_name = parts[0]
+                self.last_name = parts[-1]
+            elif len(parts) == 1:
+                self.first_name = parts[0]
+        return self
 
 
 class PersonDossier(BaseModel):

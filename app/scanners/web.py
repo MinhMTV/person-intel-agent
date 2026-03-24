@@ -71,6 +71,27 @@ class WebScanner(BaseScanner):
         for variant in self._fuzzy_name_variants(query):
             searches.append(variant)
 
+        # Name variant searches (first+last, last+first, partial)
+        name_parts = query.full_name.split()
+        if len(name_parts) >= 2:
+            first = name_parts[0]
+            last = name_parts[-1]
+            middle = name_parts[1] if len(name_parts) > 2 else None
+            
+            # Try different combinations
+            searches.append(f'"{first} {last}"')  # "Minh Vuong"
+            if middle:
+                searches.append(f'"{first} {middle} {last}"')  # "Minh Tuan Vuong"
+                searches.append(f'"{first} {middle}"')  # "Minh Tuan"
+                searches.append(f'"{middle} {last}"')  # "Tuan Vuong"
+            searches.append(f'"{last}, {first}"')  # "Vuong, Minh"
+            
+            # Username-style variants
+            searches.append(f'{first.lower()}{last.lower()}')  # minhvuong
+            if middle:
+                searches.append(f'{first[0].lower()}{middle.lower()}{last.lower()}')  # mtvuong
+                searches.append(f'{first.lower()}{middle[0].lower()}{last.lower()}')  # mtvuong
+
         # Location-enhanced searches
         searches.extend(self.location_queries(query))
 
@@ -157,35 +178,22 @@ class WebScanner(BaseScanner):
     # ------------------------------------------------------------------
 
     async def _search_ddg(self, client: httpx.AsyncClient, query: str, headers: dict) -> list[SearchResult]:
-        """Search via DuckDuckGo lite (no API key needed)."""
+        """Search via DuckDuckGo using ddgs library."""
         results: list[SearchResult] = []
-        encoded = urllib.parse.quote_plus(query)
-        url = f"https://lite.duckduckgo.com/lite/?q={encoded}"
-
-        resp = await client.get(url, headers=headers)
-        if resp.status_code != 200:
-            return results
-
-        soup = BeautifulSoup(resp.text, "html.parser")
-        for link in soup.select("a.result-link"):
-            href = link.get("href", "")
-            title = link.get_text(strip=True)
-
-            if "uddg=" in href:
-                parsed = urllib.parse.urlparse(href)
-                params = urllib.parse.parse_qs(parsed.query)
-                href = params.get("uddg", [""])[0]
-                href = urllib.parse.unquote(href)
-
-            if href and href.startswith("http") and "duckduckgo.com" not in href:
+        try:
+            from ddgs import DDGS
+            ddgs = DDGS()
+            ddg_results = ddgs.text(query, max_results=10)
+            for r in ddg_results:
                 results.append(SearchResult(
                     source=Source.WEB,
-                    title=title,
-                    url=href,
-                    snippet="",
+                    title=r.get("title", ""),
+                    url=r.get("href", ""),
+                    snippet=r.get("body", ""),
                     confidence=Confidence.MEDIUM,
                 ))
-
+        except Exception as e:
+            print(f"DDGS error: {e}")
         return results
 
     # ------------------------------------------------------------------
