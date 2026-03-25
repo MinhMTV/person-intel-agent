@@ -65,12 +65,13 @@ class WebScanner(BaseScanner):
                     except Exception:
                         pass
 
-        # Deduplicate by URL
+        # Deduplicate by normalized URL
         seen_urls: set[str] = set()
         unique: list[SearchResult] = []
         for r in results:
-            if r.url not in seen_urls:
-                seen_urls.add(r.url)
+            norm = self._normalize_url(r.url)
+            if norm not in seen_urls:
+                seen_urls.add(norm)
                 unique.append(r)
 
         # Filter by name matching
@@ -78,11 +79,73 @@ class WebScanner(BaseScanner):
         matcher = NameMatcher(query.full_name)
         filtered = matcher.filter_results(unique)
 
-        # If too few results after filtering, return original
-        if len(filtered) < 3 and len(unique) >= 3:
+        # If too few results after filtering, keep broader set
+        if len(filtered) < 5 and len(unique) >= 5:
             filtered = unique
 
+        # Rank results for profile relevance and exact-name quality
+        filtered.sort(key=lambda r: self._relevance_score(r, query), reverse=True)
+
         return filtered
+
+    def _normalize_url(self, url: str) -> str:
+        """Normalize URLs for reliable dedupe/comparison across engines."""
+        try:
+            p = urllib.parse.urlsplit((url or "").strip())
+            host = (p.netloc or "").lower()
+            path = (p.path or "/").rstrip("/") or "/"
+
+            # remove locale prefixes from LinkedIn paths: /in/.. already canonical
+            if host.endswith("linkedin.com") and path.startswith("/in/"):
+                path = "/in/" + path.split("/in/")[-1].split("/")[0]
+
+            return f"{host}{path}"
+        except Exception:
+            return (url or "").lower().strip().rstrip("/")
+
+    def _relevance_score(self, r: SearchResult, query: PersonQuery) -> float:
+        """Generic ranking for person-profile results (works for all names)."""
+        url = (r.url or "").lower()
+        title = (r.title or "").lower()
+        snippet = (r.snippet or "").lower()
+        text = f"{title} {snippet} {url}"
+
+        parts = [p.lower() for p in query.full_name.split() if p]
+        first = parts[0] if parts else ""
+        last = parts[-1] if len(parts) > 1 else ""
+        full = " ".join(parts)
+
+        score = 0.0
+
+        # Name signals
+        if full and full in text:
+            score += 8.0
+        if first and last and first in text and last in text:
+            score += 4.0
+
+        # Profile URL patterns (generic)
+        strong_patterns = ["linkedin.com/in/", "xing.com/profile/", "github.com/", "instagram.com/", "facebook.com/"]
+        if any(p in url for p in strong_patterns):
+            score += 3.0
+
+        # Penalize directory/list/group pages
+        bad_patterns = ["/pub/dir/", "/public/", "/groups/", "/story.php", "/watch", "/reel/"]
+        if any(p in url for p in bad_patterns):
+            score -= 3.0
+
+        # Confidence bonus
+        if r.confidence == Confidence.HIGH:
+            score += 2.0
+        elif r.confidence == Confidence.MEDIUM:
+            score += 1.0
+
+        # Optional username boost
+        for u in (query.usernames or []):
+            uu = u.lower().strip("@")
+            if uu and uu in url:
+                score += 3.0
+
+        return score
 
     # ------------------------------------------------------------------
     # Query building
@@ -91,6 +154,9 @@ class WebScanner(BaseScanner):
     def _build_search_queries(self, query: PersonQuery) -> list[str]:
         """Build search queries with fuzzy variants and location."""
         searches: list[str] = []
+
+        # Strong exact queries first
+        searches.append(f'"{query.full_name}"')
 
         # Basic name searches (with fuzzy variants)
         for variant in self._fuzzy_name_variants(query):
@@ -143,7 +209,24 @@ class WebScanner(BaseScanner):
         
         searches.extend([f"{name} site:{site}" for site in sites])
 
-        return searches
+        # Username-anchored profile queries (generic for all people)
+        for username in query.usernames or []:
+            u = username.strip().lstrip("@")
+            if not u:
+                continue
+            for site in sites:
+                searches.append(f'"{u}" site:{site}')
+
+        # Deduplicate while preserving order
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for s in searches:
+            key = s.strip().lower()
+            if key and key not in seen:
+                seen.add(key)
+                deduped.append(s)
+
+        return deduped
 
     def _fuzzy_name_variants(self, query: PersonQuery) -> list[str]:
         """Generate fuzzy name variants for broader search coverage.
