@@ -3,6 +3,7 @@
 from __future__ import annotations
 import asyncio
 import itertools
+import os
 import urllib.parse
 from typing import Optional
 
@@ -17,8 +18,7 @@ class WebScanner(BaseScanner):
     """Search the web for person mentions via multiple engines."""
 
     name = "web"
-    description = "DuckDuckGo + Bing + Yandex search with name variants and location expansion"
-    _ddgs_available: bool | None = None
+    description = "SearXNG (primary) + DuckDuckGo/Bing/Yandex fallback with name variants and location expansion"
 
     async def scan(self, query: PersonQuery) -> list[SearchResult]:
         """Run web search scan across multiple engines."""
@@ -33,29 +33,51 @@ class WebScanner(BaseScanner):
             "Accept-Language": "en-US,en;q=0.5",
         }
 
-        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-            # Distribute queries across engines
-            for i, search_term in enumerate(searches[:8]):
-                try:
-                    engine = i % 3
-                    if engine == 0:
-                        found = await self._search_ddg(client, search_term, headers)
-                    elif engine == 1:
-                        found = await self._search_bing(client, search_term, headers)
-                    else:
-                        found = await self._search_yandex(client, search_term, headers)
-                    results.extend(found)
-                    if i < 7:
-                        await asyncio.sleep(1.5)
-                except Exception:
-                    pass
+        searx_url = os.getenv("SEARXNG_URL", "http://127.0.0.1:8888").rstrip("/")
+        use_searx = os.getenv("SEARXNG_ENABLED", "1") not in {"0", "false", "False"}
 
-        # Deduplicate by URL
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+            # Primary: SearXNG
+            if use_searx:
+                for i, search_term in enumerate(searches[:8]):
+                    try:
+                        found = await self._search_searxng(client, searx_url, search_term, headers)
+                        results.extend(found)
+                        if i < 7:
+                            await asyncio.sleep(0.6)
+                    except Exception:
+                        pass
+
+            # Fallback if SearXNG disabled/unavailable or too few hits
+            if len(results) < 8:
+                for i, search_term in enumerate(searches[:6]):
+                    try:
+                        engine = i % 3
+                        if engine == 0:
+                            found = await self._search_ddg(client, search_term, headers)
+                        elif engine == 1:
+                            found = await self._search_bing(client, search_term, headers)
+                        else:
+                            found = await self._search_yandex(client, search_term, headers)
+                        results.extend(found)
+                        if i < 5:
+                            await asyncio.sleep(1.0)
+                    except Exception:
+                        pass
+
+        # Remove obvious noise domains before dedupe/ranking
+        cleaned: list[SearchResult] = []
+        for r in results:
+            if not self._is_noise_domain(r.url):
+                cleaned.append(r)
+
+        # Deduplicate by normalized URL
         seen_urls: set[str] = set()
         unique: list[SearchResult] = []
-        for r in results:
-            if r.url not in seen_urls:
-                seen_urls.add(r.url)
+        for r in cleaned:
+            norm = self._normalize_url(r.url)
+            if norm not in seen_urls:
+                seen_urls.add(norm)
                 unique.append(r)
 
         # Filter by name matching
@@ -63,13 +85,84 @@ class WebScanner(BaseScanner):
         matcher = NameMatcher(query.full_name)
         filtered = matcher.filter_results(unique)
 
-        # If filtering is too strict, keep original engine results instead of dropping everything.
-        if not filtered:
-            filtered = unique
-        elif len(filtered) < 3 and len(unique) >= 3:
+        # If too few results after filtering, keep broader set
+        if len(filtered) < 5 and len(unique) >= 5:
             filtered = unique
 
+        # Rank results for profile relevance and exact-name quality
+        filtered.sort(key=lambda r: self._relevance_score(r, query), reverse=True)
+
         return filtered
+
+    def _normalize_url(self, url: str) -> str:
+        """Normalize URLs for reliable dedupe/comparison across engines."""
+        try:
+            p = urllib.parse.urlsplit((url or "").strip())
+            host = (p.netloc or "").lower()
+            path = (p.path or "/").rstrip("/") or "/"
+
+            # remove locale prefixes from LinkedIn paths: /in/.. already canonical
+            if host.endswith("linkedin.com") and path.startswith("/in/"):
+                path = "/in/" + path.split("/in/")[-1].split("/")[0]
+
+            return f"{host}{path}"
+        except Exception:
+            return (url or "").lower().strip().rstrip("/")
+
+    def _is_noise_domain(self, url: str) -> bool:
+        u = (url or "").lower()
+        noisy = [
+            "whitepages.com",
+            "whois.com",
+            "taxirideestimate.com",
+            "archive.org",
+            "goodreads.com",
+        ]
+        return any(d in u for d in noisy)
+
+    def _relevance_score(self, r: SearchResult, query: PersonQuery) -> float:
+        """Generic ranking for person-profile results (works for all names)."""
+        url = (r.url or "").lower()
+        title = (r.title or "").lower()
+        snippet = (r.snippet or "").lower()
+        text = f"{title} {snippet} {url}"
+
+        parts = [p.lower() for p in query.full_name.split() if p]
+        first = parts[0] if parts else ""
+        last = parts[-1] if len(parts) > 1 else ""
+        full = " ".join(parts)
+
+        score = 0.0
+
+        # Name signals
+        if full and full in text:
+            score += 8.0
+        if first and last and first in text and last in text:
+            score += 4.0
+
+        # Profile URL patterns (generic)
+        strong_patterns = ["linkedin.com/in/", "xing.com/profile/", "github.com/", "instagram.com/", "facebook.com/"]
+        if any(p in url for p in strong_patterns):
+            score += 3.0
+
+        # Penalize directory/list/group pages
+        bad_patterns = ["/pub/dir/", "/public/", "/groups/", "/story.php", "/watch", "/reel/"]
+        if any(p in url for p in bad_patterns):
+            score -= 3.0
+
+        # Confidence bonus
+        if r.confidence == Confidence.HIGH:
+            score += 2.0
+        elif r.confidence == Confidence.MEDIUM:
+            score += 1.0
+
+        # Optional username boost
+        for u in (query.usernames or []):
+            uu = u.lower().strip("@")
+            if uu and uu in url:
+                score += 3.0
+
+        return score
 
     # ------------------------------------------------------------------
     # Query building
@@ -79,6 +172,9 @@ class WebScanner(BaseScanner):
         """Build search queries with fuzzy variants and location."""
         searches: list[str] = []
         parts = [part.strip() for part in query.full_name.split() if part.strip()]
+
+        # Strong exact queries first
+        searches.append(f'"{query.full_name}"')
 
         # Basic name searches (with fuzzy variants)
         for variant in self._fuzzy_name_variants(query):
@@ -130,20 +226,25 @@ class WebScanner(BaseScanner):
             sites = [platform_sites[p] for p in platform_sites if p not in excluded_platforms]
         
         searches.extend([f"{name} site:{site}" for site in sites])
-        if len(parts) >= 3:
-            partial_names = [
-                f'"{parts[0]} {parts[-1]}"',
-                f'"{" ".join(parts[1:])}"',
-                f'"{parts[0]} {" ".join(parts[1:-1])}"',
-                f'"{parts[-1]}, {parts[0]}"',
-            ]
-            searches.extend(
-                f"{partial_name} site:{site}"
-                for partial_name in partial_names
-                for site in sites
-            )
 
-        return list(dict.fromkeys(searches))
+        # Username-anchored profile queries (generic for all people)
+        for username in query.usernames or []:
+            u = username.strip().lstrip("@")
+            if not u:
+                continue
+            for site in sites:
+                searches.append(f'"{u}" site:{site}')
+
+        # Deduplicate while preserving order
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for s in searches:
+            key = s.strip().lower()
+            if key and key not in seen:
+                seen.add(key)
+                deduped.append(s)
+
+        return deduped
 
     def _fuzzy_name_variants(self, query: PersonQuery) -> list[str]:
         """Generate fuzzy name variants for broader search coverage.
@@ -199,6 +300,57 @@ class WebScanner(BaseScanner):
                 queries.append(f"{name} {loc.city} {loc.country}")
         
         return queries
+
+    # ------------------------------------------------------------------
+    # SearXNG
+    # ------------------------------------------------------------------
+
+    async def _search_searxng(self, client: httpx.AsyncClient, base_url: str, query: str, headers: dict) -> list[SearchResult]:
+        """Search via local SearXNG JSON API."""
+        results: list[SearchResult] = []
+        url = f"{base_url}/search"
+        params = {
+            "q": query,
+            "format": "json",
+            "language": "en-US",
+            "safesearch": 0,
+            # Prefer high-quality general web engines; configurable
+            "engines": os.getenv("SEARXNG_ENGINES", "google,duckduckgo,startpage,bing"),
+        }
+
+        resp = await client.get(url, params=params, headers=headers)
+        if resp.status_code != 200:
+            return results
+
+        payload = resp.json()
+        for r in payload.get("results", [])[:12]:
+            link = r.get("url", "")
+            title = r.get("title", "")
+            snippet = r.get("content", "") or r.get("snippet", "") or ""
+            if not link:
+                continue
+
+            confidence = Confidence.LOW
+            url_lower = link.lower()
+            if any(p in url_lower for p in ["/in/", "/profile/", "linkedin.com/in", "xing.com/profile"]):
+                confidence = Confidence.HIGH
+            elif any(p in url_lower for p in ["github.com/", "facebook.com/", "instagram.com/"]):
+                confidence = Confidence.MEDIUM
+
+            image_url = None
+            if any(p in url_lower for p in ["github.com", "linkedin.com", "xing.com", "instagram.com", "facebook.com", "twitter.com", "x.com"]):
+                image_url = await self._extract_profile_image(link)
+
+            results.append(SearchResult(
+                source=Source.WEB,
+                title=title,
+                url=link,
+                snippet=snippet,
+                confidence=confidence,
+                image_url=image_url,
+            ))
+
+        return results
 
     # ------------------------------------------------------------------
     # DuckDuckGo
