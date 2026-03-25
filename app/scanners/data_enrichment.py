@@ -62,7 +62,7 @@ class DataEnrichmentScanner:
         """
         results = []
 
-        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=6, follow_redirects=True) as client:
             for email in query.emails:
                 try:
                     verification = await self._verify_email(email)
@@ -74,14 +74,14 @@ class DataEnrichmentScanner:
         # Generate additional email patterns to check
         if query.first_name and query.last_name:
             generated = self._generate_email_patterns(query)
-            for email in generated[:5]:
+            for email in generated[:3]:
                 try:
                     verification = await self._verify_email(email)
                     if verification and verification.confidence != Confidence.LOW:
                         results.append(verification)
                 except Exception:
                     pass
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.2)
 
         return results
 
@@ -147,7 +147,8 @@ class DataEnrichmentScanner:
         try:
             import dns.resolver
             resolver = dns.resolver.Resolver()
-            resolver.timeout = 5
+            resolver.timeout = 3
+            resolver.lifetime = 3
 
             try:
                 mx = resolver.resolve(domain, "MX")
@@ -188,7 +189,7 @@ class DataEnrichmentScanner:
 
             def _check():
                 try:
-                    server = smtplib.SMTP(timeout=10)
+                    server = smtplib.SMTP(timeout=3)
                     server.connect(mx_host, 25)
                     server.helo("verify.local")
                     server.mail("verify@verify.local")
@@ -226,7 +227,7 @@ class DataEnrichmentScanner:
                 "keybase": "https://keybase.io/{}",
             }
 
-            for username in query.usernames[:3]:
+            for username in query.usernames[:2]:
                 found_on = []
                 for platform, url_template in platforms.items():
                     try:
@@ -242,7 +243,7 @@ class DataEnrichmentScanner:
                             found_on.append(platform)
                     except Exception:
                         pass
-                    await asyncio.sleep(0.3)
+                    await asyncio.sleep(0.15)
 
                 if len(found_on) >= 2:
                     results.append(SearchResult(

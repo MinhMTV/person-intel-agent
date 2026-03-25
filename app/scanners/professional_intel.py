@@ -202,7 +202,7 @@ class ProfessionalIntelScanner:
 
                     if resp.status_code == 200:
                         data = resp.json()
-                        for result in data.get("result", []):
+                        for result in (data.get("result") or []):
                             orcid_id = result.get("orcid-identifier", {}).get("path", "")
                             if not orcid_id:
                                 continue
@@ -218,24 +218,26 @@ class ProfessionalIntelScanner:
 
                             if profile_resp.status_code == 200:
                                 profile = profile_resp.json()
-                                person = profile.get("person", {})
+                                person = profile.get("person") or {}
 
                                 # Name
-                                name_data = person.get("name", {})
-                                given = name_data.get("given-names", {}).get("value", "")
-                                family = name_data.get("family-name", {}).get("value", "")
+                                name_data = person.get("name") or {}
+                                given = (name_data.get("given-names") or {}).get("value", "")
+                                family = (name_data.get("family-name") or {}).get("value", "")
                                 full_name = f"{given} {family}".strip()
 
                                 # Bio
-                                bio_el = person.get("biography", {})
+                                bio_el = person.get("biography") or {}
                                 bio = bio_el.get("content", "") if bio_el else ""
 
                                 # Employment
-                                employments = person.get("employments", {}).get("employment-summary", [])
+                                activities = profile.get("activities-summary") or {}
+                                employments_group = ((activities.get("employments") or {}).get("affiliation-group") or [])
                                 employment_str = ""
-                                if employments:
-                                    emp = employments[0]
-                                    org = emp.get("organization", {}).get("name", "")
+                                if employments_group:
+                                    summaries = employments_group[0].get("summaries") or []
+                                    emp = (summaries[0].get("employment-summary") or {}) if summaries else {}
+                                    org = (emp.get("organization") or {}).get("name", "")
                                     role = emp.get("role-title", "")
                                     if org:
                                         employment_str = f"{role} at {org}" if role else org

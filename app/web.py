@@ -111,6 +111,8 @@ async def index():
 @app.post("/api/search")
 async def api_search(
     name: str = Form(...),
+    first_name: str = Form(""),
+    last_name: str = Form(""),
     locations: str = Form(""),
     usernames: str = Form(""),
     nicknames: str = Form(""),
@@ -150,10 +152,12 @@ async def api_search(
 
     # Build query
     parts = name.strip().split()
+    first_name_value = first_name.strip() or (parts[0] if parts else None)
+    last_name_value = last_name.strip() or (parts[-1] if len(parts) > 1 else None)
     query = PersonQuery(
         full_name=name.strip(),
-        first_name=parts[0] if parts else None,
-        last_name=parts[-1] if len(parts) > 1 else None,
+        first_name=first_name_value,
+        last_name=last_name_value,
         nicknames=nick_list,
         locations=[Location(raw=loc) for loc in loc_list],
         countries=include_countries,
@@ -192,7 +196,12 @@ async def api_search(
 
     return {
         "id": dossier_id,
-        "query": {"name": query.full_name, "locations": loc_list},
+        "query": {
+            "name": query.full_name,
+            "first_name": query.first_name,
+            "last_name": query.last_name,
+            "locations": loc_list,
+        },
         "results": {
             "social_profiles": len(dossier.social_profiles),
             "web_results": len(dossier.web_results),
@@ -772,6 +781,8 @@ async def api_dossier_download(dossier_id: str, fmt: str = "json"):
 @app.get("/api/search/stream")
 async def api_search_stream(
     name: str,
+    first_name: str = "",
+    last_name: str = "",
     locations: str = "",
     usernames: str = "",
     nicknames: str = "",
@@ -791,8 +802,8 @@ async def api_search_stream(
         parts = name.strip().split()
         query = PersonQuery(
             full_name=name.strip(),
-            first_name=parts[0] if parts else None,
-            last_name=parts[-1] if len(parts) > 1 else None,
+            first_name=first_name.strip() or (parts[0] if parts else None),
+            last_name=last_name.strip() or (parts[-1] if len(parts) > 1 else None),
             nicknames=nick_list,
             locations=[Location(raw=loc) for loc in loc_list],
             usernames=user_list,
@@ -998,6 +1009,9 @@ async def _run_all_scanners(query: PersonQuery) -> PersonDossier:
         image_matches=dossier.image_matches,
         query=query,
     )
+    dossier.social_profiles = [item["profile"] for item in scored["social"]]
+    dossier.web_results = [item["result"] for item in scored["web"]]
+    dossier.image_matches = [item["match"] for item in scored["images"]]
     dossier.confidence_score = scored["overall_confidence"]
 
     dossier.total_sources_checked = (

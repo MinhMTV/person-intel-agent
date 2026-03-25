@@ -99,6 +99,7 @@ class TestPersonDossier:
         summary = d.summary()
         assert "John Smith" in summary
         assert "github" in summary
+        assert "Result Breakdown" in summary
 
     def test_with_results(self):
         q = PersonQuery(full_name="Test Person")
@@ -112,6 +113,20 @@ class TestPersonDossier:
         ]
         assert len(d.social_profiles) == 2
         assert len(d.web_results) == 1
+
+    def test_summary_includes_professional_and_images(self):
+        q = PersonQuery(full_name="Jane Doe")
+        d = PersonDossier(query=q)
+        d.professional = [
+            SearchResult(source=Source.LINKEDIN, title="Jane Doe | LinkedIn", url="https://linkedin.com/in/janedoe")
+        ]
+        d.image_matches = [
+            ImageMatch(source_url="https://example.com/profile", image_url="https://img.com/jane.jpg", similarity_score=0.88, context="Profile photo")
+        ]
+        summary = d.summary()
+        assert "Professional Results" in summary
+        assert "Best Image Matches" in summary
+        assert "88% match" in summary
 
 
 class TestImageMatch:

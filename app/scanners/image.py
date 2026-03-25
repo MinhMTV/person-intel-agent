@@ -15,6 +15,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from app.models import PersonQuery, ImageMatch, Confidence
+from app.playwright_support import can_use_playwright
 
 
 class ImageScanner:
@@ -95,7 +96,8 @@ class ImageScanner:
         candidates = []
 
         # Source 1: Google Images via Playwright
-        candidates.extend(await self._search_google_images(query))
+        if can_use_playwright():
+            candidates.extend(await self._search_google_images(query))
 
         # Source 2: GitHub avatars (API-based, fast)
         candidates.extend(await self._fetch_github_avatars(query))

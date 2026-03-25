@@ -20,10 +20,23 @@ class BaseScanner(ABC):
     def name_variants(self, query: PersonQuery) -> list[str]:
         """Generate name search variants."""
         variants = [query.full_name]
+        parts = [part.strip() for part in query.full_name.split() if part.strip()]
         if query.first_name and query.last_name:
             variants.append(f"{query.first_name} {query.last_name}")
             variants.append(f"{query.last_name}, {query.first_name}")
             variants.append(f"{query.last_name} {query.first_name}")
+        if len(parts) >= 3:
+            first = parts[0]
+            middle_parts = parts[1:-1]
+            last = parts[-1]
+            middle_joined = " ".join(middle_parts)
+            variants.extend([
+                f"{first} {middle_joined}",
+                f"{middle_joined} {last}",
+                f"{first} {last}",
+                f"{last}, {first} {middle_joined}",
+                f"{last} {first} {middle_joined}",
+            ])
         # Add nickname variants
         for nick in query.nicknames:
             if query.last_name:
@@ -31,7 +44,10 @@ class BaseScanner(ABC):
             variants.append(nick)
         # Add quoted exact match
         variants.append(f'"{query.full_name}"')
-        return variants
+        if len(parts) >= 3:
+            variants.append(f'"{parts[0]} {parts[-1]}"')
+            variants.append(f'"{" ".join(parts[1:])}"')
+        return list(dict.fromkeys(v for v in variants if v))
 
     def location_queries(self, query: PersonQuery) -> list[str]:
         """Generate location-enhanced search terms with geo-expansion."""

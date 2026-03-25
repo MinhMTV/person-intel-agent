@@ -10,6 +10,7 @@ Usage:
 """
 
 import argparse
+import asyncio
 import os
 import socket
 import sys
@@ -17,6 +18,9 @@ import subprocess
 import time
 import webbrowser
 from pathlib import Path
+
+if os.name == "nt" and hasattr(asyncio, "WindowsProactorEventLoopPolicy"):
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 from app.login_manager import ensure_playwright_browser
 

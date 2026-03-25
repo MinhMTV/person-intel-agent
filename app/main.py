@@ -376,6 +376,9 @@ async def _run_scanners(query: PersonQuery, scanner_list: str) -> PersonDossier:
         image_matches=dossier.image_matches,
         query=query,
     )
+    dossier.social_profiles = [item["profile"] for item in scored["social"]]
+    dossier.web_results = [item["result"] for item in scored["web"]]
+    dossier.image_matches = [item["match"] for item in scored["images"]]
     dossier.confidence_score = scored["overall_confidence"]
 
     return dossier

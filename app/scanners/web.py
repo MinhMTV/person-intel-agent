@@ -18,6 +18,7 @@ class WebScanner(BaseScanner):
 
     name = "web"
     description = "DuckDuckGo + Bing + Yandex search with name variants and location expansion"
+    _ddgs_available: bool | None = None
 
     async def scan(self, query: PersonQuery) -> list[SearchResult]:
         """Run web search scan across multiple engines."""
@@ -62,8 +63,10 @@ class WebScanner(BaseScanner):
         matcher = NameMatcher(query.full_name)
         filtered = matcher.filter_results(unique)
 
-        # If too few results after filtering, return original
-        if len(filtered) < 3 and len(unique) >= 3:
+        # If filtering is too strict, keep original engine results instead of dropping everything.
+        if not filtered:
+            filtered = unique
+        elif len(filtered) < 3 and len(unique) >= 3:
             filtered = unique
 
         return filtered
@@ -75,6 +78,7 @@ class WebScanner(BaseScanner):
     def _build_search_queries(self, query: PersonQuery) -> list[str]:
         """Build search queries with fuzzy variants and location."""
         searches: list[str] = []
+        parts = [part.strip() for part in query.full_name.split() if part.strip()]
 
         # Basic name searches (with fuzzy variants)
         for variant in self._fuzzy_name_variants(query):
@@ -126,8 +130,20 @@ class WebScanner(BaseScanner):
             sites = [platform_sites[p] for p in platform_sites if p not in excluded_platforms]
         
         searches.extend([f"{name} site:{site}" for site in sites])
+        if len(parts) >= 3:
+            partial_names = [
+                f'"{parts[0]} {parts[-1]}"',
+                f'"{" ".join(parts[1:])}"',
+                f'"{parts[0]} {" ".join(parts[1:-1])}"',
+                f'"{parts[-1]}, {parts[0]}"',
+            ]
+            searches.extend(
+                f"{partial_name} site:{site}"
+                for partial_name in partial_names
+                for site in sites
+            )
 
-        return searches
+        return list(dict.fromkeys(searches))
 
     def _fuzzy_name_variants(self, query: PersonQuery) -> list[str]:
         """Generate fuzzy name variants for broader search coverage.
@@ -193,6 +209,7 @@ class WebScanner(BaseScanner):
         results: list[SearchResult] = []
         try:
             from ddgs import DDGS
+            self.__class__._ddgs_available = True
             ddgs = DDGS()
             ddg_results = ddgs.text(query, max_results=10)
             for r in ddg_results:
@@ -230,8 +247,46 @@ class WebScanner(BaseScanner):
                     confidence=confidence,
                     image_url=image_url,
                 ))
+        except ImportError:
+            self.__class__._ddgs_available = False
+            return await self._search_ddg_html(client, query, headers)
         except Exception as e:
             print(f"DDGS error: {e}")
+        return results
+
+    async def _search_ddg_html(self, client: httpx.AsyncClient, query: str, headers: dict) -> list[SearchResult]:
+        """Fallback DuckDuckGo HTML scraping when the ddgs package is unavailable."""
+        results: list[SearchResult] = []
+        encoded = urllib.parse.quote_plus(query)
+        url = f"https://html.duckduckgo.com/html/?q={encoded}"
+
+        try:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code != 200:
+                return results
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+            for item in soup.select(".result, .web-result"):
+                link_el = item.select_one("a.result__a, a[data-testid='result-title-a']")
+                if not link_el:
+                    continue
+
+                href = link_el.get("href", "")
+                title = link_el.get_text(strip=True)
+                snippet_el = item.select_one(".result__snippet, .result__body")
+                snippet = snippet_el.get_text(" ", strip=True) if snippet_el else ""
+
+                if href and href.startswith("http"):
+                    results.append(SearchResult(
+                        source=Source.WEB,
+                        title=title,
+                        url=href,
+                        snippet=snippet,
+                        confidence=Confidence.MEDIUM,
+                    ))
+        except Exception:
+            return []
+
         return results
 
     # ------------------------------------------------------------------

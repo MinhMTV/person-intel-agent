@@ -31,7 +31,7 @@ class SocialScanner(BaseScanner):
         selected_platforms = set(p.lower() for p in query.include_platforms or [])
 
         # Generate usernames from name
-        usernames = self._generate_usernames(query)[:6]
+        usernames = self._generate_usernames(query)[:16]
 
         # Check known platforms
         checks = [self._check_username(username, selected_platforms) for username in usernames]
@@ -55,6 +55,7 @@ class SocialScanner(BaseScanner):
     def _generate_usernames(self, query: PersonQuery) -> list[str]:
         """Generate likely usernames from name."""
         usernames = list(query.usernames)  # Start with known usernames
+        parts = [part.lower() for part in query.full_name.split() if part.strip()]
 
         if query.first_name and query.last_name:
             fn = query.first_name.lower()
@@ -69,6 +70,38 @@ class SocialScanner(BaseScanner):
                 f"{ln}.{fn}",          # smith.john
                 f"{fn}-{ln}",          # john-smith
             ])
+        if len(parts) >= 3:
+            first = parts[0]
+            middle_parts = parts[1:-1]
+            last = parts[-1]
+            middle = "".join(middle_parts)
+            initials = "".join(part[0] for part in parts)
+            tail_initials = "".join(part[0] for part in parts[1:])
+            middle_last = "".join(parts[1:])
+            usernames.extend([
+                f"{first}{middle}{last}",
+                f"{first}{middle_parts[0]}{last}" if middle_parts else "",
+                f"{first}{tail_initials}",
+                f"{first}{initials}",
+                f"{first}.{middle_parts[0]}.{last}" if middle_parts else "",
+                f"{first}{middle_last}",
+                f"{first}{middle}",
+                f"{middle}{last}",
+                f"{first}{middle_parts[0]}{last[0]}" if middle_parts and last else "",
+                f"{first}{tail_initials}{last[0]}" if tail_initials and last else "",
+                f"{first}{tail_initials[0]}" if tail_initials else "",
+                f"{first}{tail_initials}",
+                f"{first}{middle_parts[0]}{last[0]}" if middle_parts else "",
+                f"{first}.{last}.{initials}",
+                f"{first}.{last[:2]}.{initials}" if len(last) >= 2 else "",
+                f"{first}.{last[:2]}.{tail_initials}" if len(last) >= 2 else "",
+                f"{first}.{last[:2]}.{initials[-1]}" if len(last) >= 2 and initials else "",
+                f"{first}.{last[:2]}.{tail_initials[0]}{last[0]}" if len(last) >= 2 and tail_initials and last else "",
+                f"{first}{last[:2]}{initials}",
+                f"{first}{last[:2]}{tail_initials}",
+                f"{first}{last[:2]}",
+                f"{first}{middle_parts[0][0]}{last[0]}" if middle_parts else "",
+            ])
 
         # Add nicknames
         for nick in query.nicknames:
@@ -79,7 +112,16 @@ class SocialScanner(BaseScanner):
                 usernames.append(f"{nick}{ln}")
                 usernames.append(f"{nick}.{ln}")
 
-        return list(set(usernames))
+        cleaned = []
+        seen = set()
+        for username in usernames:
+            username = str(username).strip().strip(".-_")
+            if not username:
+                continue
+            if username not in seen:
+                seen.add(username)
+                cleaned.append(username)
+        return cleaned
 
     async def _check_username(self, username: str, selected_platforms: set[str] | None = None) -> list[SocialProfile]:
         """Check a username against known platforms."""

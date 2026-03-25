@@ -102,14 +102,14 @@ class PublicRecordsScanner:
 
         loop = asyncio.get_event_loop()
 
-        for domain in domains[:10]:
+        for domain in domains[:4]:
             try:
                 w = await loop.run_in_executor(None, self._whois_query, domain)
                 if w:
                     results.append(w)
             except Exception:
                 pass
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.15)
 
         return results
 
@@ -174,7 +174,7 @@ class PublicRecordsScanner:
         resolver.timeout = 5
         resolver.lifetime = 5
 
-        for domain in domains[:5]:
+        for domain in domains[:3]:
             try:
                 # A records
                 try:
@@ -207,7 +207,7 @@ class PublicRecordsScanner:
             except Exception:
                 pass
 
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(0.1)
 
         return results
 
@@ -233,7 +233,8 @@ class PublicRecordsScanner:
             try:
                 import dns.resolver
                 resolver = dns.resolver.Resolver()
-                resolver.timeout = 5
+                resolver.timeout = 3
+                resolver.lifetime = 3
 
                 try:
                     mx = resolver.resolve(domain, "MX")

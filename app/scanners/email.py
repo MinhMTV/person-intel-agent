@@ -50,7 +50,7 @@ class EmailScanner(BaseScanner):
 
         # Step 2: Verify via SMTP (best-effort, don't fail hard)
         verified: list[str] = []
-        for email in candidates[:20]:  # Cap at 20 to avoid being blocked
+        for email in candidates[:6]:  # Keep runtime bounded for the webapp scanner pool
             try:
                 is_valid = await asyncio.to_thread(self._smtp_check, email)
                 if is_valid:
@@ -147,7 +147,7 @@ class EmailScanner(BaseScanner):
     # SMTP verification
     # ------------------------------------------------------------------
 
-    def _smtp_check(self, email: str, timeout: int = 10) -> bool:
+    def _smtp_check(self, email: str, timeout: int = 3) -> bool:
         """Verify an email address exists via SMTP RCPT TO.
 
         Connects to the MX server, sends HELO + MAIL FROM + RCPT TO,
@@ -160,7 +160,10 @@ class EmailScanner(BaseScanner):
 
         # Resolve MX records
         try:
-            mx_records = dns.resolver.resolve(domain, "MX")
+            resolver = dns.resolver.Resolver()
+            resolver.timeout = timeout
+            resolver.lifetime = timeout
+            mx_records = resolver.resolve(domain, "MX")
             mx_hosts = sorted(
                 [(r.preference, str(r.exchange).rstrip(".")) for r in mx_records]
             )

@@ -141,17 +141,23 @@
                   hx-indicator="#search-spinner"
                   class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5">
 
-                <!-- Name (required) -->
-                <div class="relative">
-                    <label for="name-input" class="block text-sm font-medium text-slate-400 mb-1">Full Name <span class="text-red-400">*</span></label>
-                    <input type="text" name="name" required id="name-input"
-                        autocomplete="name"
-                        placeholder="e.g. John Smith"
-                        oninput="suggestNames(this.value)"
-                        onblur="setTimeout(() => hideSuggestions(), 200)"
-                        class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100
-                               placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                    <div id="name-suggestions" class="absolute z-20 w-full bg-slate-800 border border-slate-700 rounded-lg mt-1 shadow-xl hidden max-h-48 overflow-y-auto"></div>
+                <!-- Name -->
+                <input type="hidden" name="name" required id="name-input">
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="first-name-field" class="block text-sm font-medium text-slate-400 mb-1">First Name <span class="text-red-400">*</span></label>
+                        <input type="text" name="first_name" id="first-name-field" autocomplete="given-name"
+                            placeholder="e.g. John"
+                            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100
+                                   placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label for="last-name-field" class="block text-sm font-medium text-slate-400 mb-1">Last Name</label>
+                        <input type="text" name="last_name" id="last-name-field" autocomplete="family-name"
+                            placeholder="e.g. Smith"
+                            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100
+                                   placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
                 </div>
                 <div class="flex items-center gap-4">
                     <label class="flex items-center gap-2 text-sm text-slate-400">
@@ -446,12 +452,30 @@
     }
 
     function selectSuggestion(name) {
-        document.getElementById('name-input').value = name;
-        document.getElementById('name-suggestions').classList.add('hidden');
+        const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+        const first = parts[0] || '';
+        const last = parts.length > 1 ? parts[parts.length - 1] : '';
+        const firstField = document.getElementById('first-name-field');
+        const lastField = document.getElementById('last-name-field');
+        if (firstField) firstField.value = first;
+        if (lastField) lastField.value = last;
+        syncFullNameField();
+        const suggestions = document.getElementById('name-suggestions');
+        if (suggestions) suggestions.classList.add('hidden');
     }
 
     function hideSuggestions() {
-        document.getElementById('name-suggestions').classList.add('hidden');
+        const suggestions = document.getElementById('name-suggestions');
+        if (suggestions) suggestions.classList.add('hidden');
+    }
+
+    function syncFullNameField() {
+        const first = (document.getElementById('first-name-field')?.value || '').trim();
+        const last = (document.getElementById('last-name-field')?.value || '').trim();
+        const fullName = [first, last].filter(Boolean).join(' ').trim();
+        const hidden = document.getElementById('name-input');
+        if (hidden) hidden.value = fullName;
+        return fullName;
     }
 
     // =====================================================================
@@ -495,8 +519,18 @@
         return d.innerHTML;
     }
 
+    function hostnameFor(url) {
+        try {
+            return new URL(url).hostname.replace('www.', '');
+        } catch {
+            return url || '';
+        }
+    }
+
     // Enter key on inputs
-    document.querySelectorAll('[id$="-input"]').forEach(el => {
+    ['locations-input', 'usernames-input', 'nicknames-input'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
         el.addEventListener('keydown', e => {
             if (e.key === 'Enter') {
                 e.preventDefault();
@@ -504,6 +538,24 @@
             }
         });
     });
+
+    ['first-name-field', 'last-name-field'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', () => syncFullNameField());
+    });
+
+    const searchFormEl = document.getElementById('searchForm');
+    if (searchFormEl) {
+        searchFormEl.addEventListener('submit', event => {
+            const fullName = syncFullNameField();
+            if (!fullName) {
+                event.preventDefault();
+                showToast('Please enter at least a first name.', 'error');
+                document.getElementById('first-name-field')?.focus();
+            }
+        });
+    }
 
     // =====================================================================
     // Photo drag & drop
@@ -1466,6 +1518,8 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
 
     function queryScopeChips(query) {
         const chips = [];
+        if (query.first_name) chips.push({ label: `First`, value: query.first_name });
+        if (query.last_name) chips.push({ label: `Last`, value: query.last_name });
         (query.locations || []).forEach(loc => chips.push({ label: `Location`, value: loc.raw || loc.city || loc.country }));
         (query.include_continents || []).forEach(v => chips.push({ label: `Include continent`, value: v }));
         (query.include_countries || []).forEach(v => chips.push({ label: `Include country`, value: v }));
@@ -1894,7 +1948,17 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
 
     function renderWebResults(results) {
         if (!results || !results.length) return emptyState('No web results found.');
-        return `<div class="space-y-3">${results.slice(0, 20).map(r => `
+        const scoreMap = { high: 3, medium: 2, low: 1 };
+        const sortedResults = [...results].sort((a, b) => {
+            const aScore = scoreMap[a.confidence] || 0;
+            const bScore = scoreMap[b.confidence] || 0;
+            if (bScore !== aScore) return bScore - aScore;
+            const aImage = a.image_url ? 1 : 0;
+            const bImage = b.image_url ? 1 : 0;
+            if (bImage !== aImage) return bImage - aImage;
+            return (b.snippet || '').length - (a.snippet || '').length;
+        });
+        return `<div class="space-y-3">${sortedResults.slice(0, 20).map(r => `
             <div class="p-3 bg-slate-800/50 rounded-xl relative flex gap-4 items-start">
                 <div class="w-16 h-16 rounded-xl overflow-hidden bg-slate-900 border border-slate-700 flex-shrink-0 flex items-center justify-center">
                     ${r.image_url
@@ -1902,9 +1966,12 @@ Jane Doe,Hamburg,jdoe,,jane@test.com</code>
                         : '<span class="text-xl">🌐</span>'}
                 </div>
                 <div class="min-w-0 flex-1">
-                    <a href="${escHtml(r.url)}" target="_blank" rel="noopener" class="text-blue-400 hover:underline font-medium">${escHtml(r.title)}</a>
+                    <div class="flex items-center gap-2 flex-wrap pr-12">
+                        <a href="${escHtml(r.url)}" target="_blank" rel="noopener" class="text-blue-400 hover:underline font-medium">${escHtml(r.title)}</a>
+                        <span class="text-xs px-2 py-0.5 rounded-full ${confClass(r.confidence)}">${escHtml(r.confidence)}</span>
+                    </div>
                     <div class="text-sm text-slate-500 truncate mt-1">${escHtml(r.snippet || r.url)}</div>
-                    <div class="text-xs text-slate-600 mt-1">${escHtml(r.source)} · ${escHtml(r.confidence)}</div>
+                    <div class="text-xs text-slate-600 mt-1">${escHtml(r.source)} · ${escHtml(hostnameFor(r.url))}</div>
                 </div>
                 <button onclick="copyProfileJson(this, '${escHtml(JSON.stringify(r))}')" class="absolute top-3 right-3 text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 transition" title="Copy as JSON">📋</button>
             </div>`).join('')}</div>`;

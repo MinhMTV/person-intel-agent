@@ -11,6 +11,7 @@ import httpx
 
 from app.models import PersonQuery, SearchResult, SocialProfile, ImageMatch, Source, Confidence
 from app.login_manager import load_cookies, save_cookies
+from app.playwright_support import can_use_playwright, playwright_runtime_issue
 
 
 class LinkedInScraper:
@@ -347,6 +348,10 @@ class ProfessionalScanner:
         """Search both platforms and return results."""
         results = []
         selected_platforms = set(p.lower() for p in query.include_platforms or [])
+
+        if not can_use_playwright():
+            print(playwright_runtime_issue())
+            return results
 
         # LinkedIn
         if not selected_platforms or "linkedin" in selected_platforms:

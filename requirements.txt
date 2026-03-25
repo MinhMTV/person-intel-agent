@@ -16,6 +16,7 @@ python-multipart>=0.0.6
 
 # Browser Automation
 playwright>=1.40
+ddgs>=8.0
 
 # Image Analysis
 opencv-python-headless>=4.8; python_version < "3.13"

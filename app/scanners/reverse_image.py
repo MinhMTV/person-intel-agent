@@ -21,6 +21,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from app.models import PersonQuery, ImageMatch, Confidence
+from app.playwright_support import can_use_playwright, playwright_runtime_issue
 
 
 class ReverseImageScanner:
@@ -53,6 +54,9 @@ class ReverseImageScanner:
     async def scan(self, query: PersonQuery) -> list[ImageMatch]:
         """Run reverse image search across all engines."""
         if not query.photo_path or not os.path.exists(query.photo_path):
+            return []
+        if not can_use_playwright():
+            print(playwright_runtime_issue())
             return []
 
         # Verify face exists in reference
