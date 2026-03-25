@@ -65,10 +65,16 @@ class WebScanner(BaseScanner):
                     except Exception:
                         pass
 
+        # Remove obvious noise domains before dedupe/ranking
+        cleaned: list[SearchResult] = []
+        for r in results:
+            if not self._is_noise_domain(r.url):
+                cleaned.append(r)
+
         # Deduplicate by normalized URL
         seen_urls: set[str] = set()
         unique: list[SearchResult] = []
-        for r in results:
+        for r in cleaned:
             norm = self._normalize_url(r.url)
             if norm not in seen_urls:
                 seen_urls.add(norm)
@@ -102,6 +108,17 @@ class WebScanner(BaseScanner):
             return f"{host}{path}"
         except Exception:
             return (url or "").lower().strip().rstrip("/")
+
+    def _is_noise_domain(self, url: str) -> bool:
+        u = (url or "").lower()
+        noisy = [
+            "whitepages.com",
+            "whois.com",
+            "taxirideestimate.com",
+            "archive.org",
+            "goodreads.com",
+        ]
+        return any(d in u for d in noisy)
 
     def _relevance_score(self, r: SearchResult, query: PersonQuery) -> float:
         """Generic ranking for person-profile results (works for all names)."""
@@ -296,6 +313,8 @@ class WebScanner(BaseScanner):
             "format": "json",
             "language": "en-US",
             "safesearch": 0,
+            # Prefer high-quality general web engines; configurable
+            "engines": os.getenv("SEARXNG_ENGINES", "google,duckduckgo,startpage,bing"),
         }
 
         resp = await client.get(url, params=params, headers=headers)
