@@ -3,6 +3,7 @@
 from __future__ import annotations
 import asyncio
 import itertools
+import os
 import urllib.parse
 from typing import Optional
 
@@ -17,7 +18,7 @@ class WebScanner(BaseScanner):
     """Search the web for person mentions via multiple engines."""
 
     name = "web"
-    description = "DuckDuckGo + Bing + Yandex search with name variants and location expansion"
+    description = "SearXNG (primary) + DuckDuckGo/Bing/Yandex fallback with name variants and location expansion"
 
     async def scan(self, query: PersonQuery) -> list[SearchResult]:
         """Run web search scan across multiple engines."""
@@ -32,22 +33,37 @@ class WebScanner(BaseScanner):
             "Accept-Language": "en-US,en;q=0.5",
         }
 
+        searx_url = os.getenv("SEARXNG_URL", "http://127.0.0.1:8888").rstrip("/")
+        use_searx = os.getenv("SEARXNG_ENABLED", "1") not in {"0", "false", "False"}
+
         async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-            # Distribute queries across engines
-            for i, search_term in enumerate(searches[:8]):
-                try:
-                    engine = i % 3
-                    if engine == 0:
-                        found = await self._search_ddg(client, search_term, headers)
-                    elif engine == 1:
-                        found = await self._search_bing(client, search_term, headers)
-                    else:
-                        found = await self._search_yandex(client, search_term, headers)
-                    results.extend(found)
-                    if i < 7:
-                        await asyncio.sleep(1.5)
-                except Exception:
-                    pass
+            # Primary: SearXNG
+            if use_searx:
+                for i, search_term in enumerate(searches[:8]):
+                    try:
+                        found = await self._search_searxng(client, searx_url, search_term, headers)
+                        results.extend(found)
+                        if i < 7:
+                            await asyncio.sleep(0.6)
+                    except Exception:
+                        pass
+
+            # Fallback if SearXNG disabled/unavailable or too few hits
+            if len(results) < 8:
+                for i, search_term in enumerate(searches[:6]):
+                    try:
+                        engine = i % 3
+                        if engine == 0:
+                            found = await self._search_ddg(client, search_term, headers)
+                        elif engine == 1:
+                            found = await self._search_bing(client, search_term, headers)
+                        else:
+                            found = await self._search_yandex(client, search_term, headers)
+                        results.extend(found)
+                        if i < 5:
+                            await asyncio.sleep(1.0)
+                    except Exception:
+                        pass
 
         # Deduplicate by URL
         seen_urls: set[str] = set()
@@ -183,6 +199,55 @@ class WebScanner(BaseScanner):
                 queries.append(f"{name} {loc.city} {loc.country}")
         
         return queries
+
+    # ------------------------------------------------------------------
+    # SearXNG
+    # ------------------------------------------------------------------
+
+    async def _search_searxng(self, client: httpx.AsyncClient, base_url: str, query: str, headers: dict) -> list[SearchResult]:
+        """Search via local SearXNG JSON API."""
+        results: list[SearchResult] = []
+        url = f"{base_url}/search"
+        params = {
+            "q": query,
+            "format": "json",
+            "language": "en-US",
+            "safesearch": 0,
+        }
+
+        resp = await client.get(url, params=params, headers=headers)
+        if resp.status_code != 200:
+            return results
+
+        payload = resp.json()
+        for r in payload.get("results", [])[:12]:
+            link = r.get("url", "")
+            title = r.get("title", "")
+            snippet = r.get("content", "") or r.get("snippet", "") or ""
+            if not link:
+                continue
+
+            confidence = Confidence.LOW
+            url_lower = link.lower()
+            if any(p in url_lower for p in ["/in/", "/profile/", "linkedin.com/in", "xing.com/profile"]):
+                confidence = Confidence.HIGH
+            elif any(p in url_lower for p in ["github.com/", "facebook.com/", "instagram.com/"]):
+                confidence = Confidence.MEDIUM
+
+            image_url = None
+            if any(p in url_lower for p in ["github.com", "linkedin.com", "xing.com", "instagram.com", "facebook.com", "twitter.com", "x.com"]):
+                image_url = await self._extract_profile_image(link)
+
+            results.append(SearchResult(
+                source=Source.WEB,
+                title=title,
+                url=link,
+                snippet=snippet,
+                confidence=confidence,
+                image_url=image_url,
+            ))
+
+        return results
 
     # ------------------------------------------------------------------
     # DuckDuckGo
