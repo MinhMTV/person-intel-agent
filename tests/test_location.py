@@ -1,11 +1,10 @@
 """Tests for location intelligence module."""
 
-import pytest
 from app.analysis.location import (
-    expand_location,
-    build_location_queries,
-    get_location_hierarchy,
     ALL_LOCATIONS,
+    build_location_queries,
+    expand_location,
+    get_location_hierarchy,
 )
 
 

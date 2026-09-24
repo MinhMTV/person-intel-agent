@@ -1,172 +1,99 @@
 #!/usr/bin/env python3
-"""
-Person Intel Agent — Starter Script
-Startet die Webapp automatisch im Browser.
+"""Person Intel Agent — local starter.
 
 Usage:
-    python run.py
+    python run.py                 # start on http://127.0.0.1:8000 and open the browser
     python run.py --port 8080
     python run.py --no-browser
+    python run.py --install       # create .venv (if needed) and install requirements
+    python run.py --dev           # auto-reload for development (never use in production)
+
+Production: set APP_ENV=production and run `python -m app serve` behind a
+reverse proxy with TLS and APP_API_TOKEN configured.
 """
 
+from __future__ import annotations
+
 import argparse
-import asyncio
 import os
 import socket
-import sys
 import subprocess
+import sys
+import threading
 import time
 import webbrowser
 from pathlib import Path
 
-if os.name == "nt" and hasattr(asyncio, "WindowsProactorEventLoopPolicy"):
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-
-from app.login_manager import ensure_playwright_browser
+ROOT = Path(__file__).resolve().parent
 
 
-def configure_stdio() -> None:
-    """Prefer UTF-8 console output when the interpreter supports reconfiguration."""
-    for stream_name in ("stdout", "stderr"):
-        stream = getattr(sys, stream_name, None)
-        reconfigure = getattr(stream, "reconfigure", None)
-        if callable(reconfigure):
-            reconfigure(encoding="utf-8", errors="replace")
+def in_venv() -> bool:
+    return sys.prefix != getattr(sys, "base_prefix", sys.prefix)
 
 
-def check_venv():
-    """Prüft ob venv existiert und aktiviert ist."""
-    venv_path = Path(__file__).parent / ".venv"
-    if not venv_path.exists():
-        print("📦 Erstelle Virtual Environment...")
-        subprocess.run([sys.executable, "-m", "venv", str(venv_path)], check=True)
-        print("✅ Virtual Environment erstellt!")
-    
-    # Check if we're in venv
-    if hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
-        return True
-    
-    # Re-run in venv
-    python = str(venv_path / "bin" / "python")
-    if not Path(python).exists():
-        python = str(venv_path / "Scripts" / "python.exe")  # Windows
-    
-    print("🔄 Starte in Virtual Environment...")
-    os.execv(python, [python] + sys.argv)
-
-def install_deps():
-    """Installiert Dependencies."""
-    req_file = Path(__file__).parent / "requirements.txt"
-    if req_file.exists():
-        print("📦 Installiere Dependencies...")
-        subprocess.run(
-            [sys.executable, "-m", "pip", "install", "-r", str(req_file), "-q"],
-            check=True
-        )
-        print("✅ Dependencies installiert!")
+def venv_python() -> Path:
+    venv = ROOT / ".venv"
+    candidate = venv / "bin" / "python"
+    return candidate if candidate.exists() else venv / "Scripts" / "python.exe"
 
 
-def ensure_browser_binaries():
-    """Install Playwright Chromium automatically if needed."""
-    print("🌐 Prüfe Playwright Browser...")
-    result = ensure_playwright_browser("chromium")
-    if not result.get("success"):
-        print("⚠️ Playwright Chromium konnte nicht automatisch installiert werden.")
-        print(result.get("error", "Unknown error"))
-        return False
-    if result.get("installed"):
-        print("✅ Playwright Chromium installiert!")
-    else:
-        print("✅ Playwright Chromium bereit.")
-    return True
+def ensure_venv() -> None:
+    """Re-exec inside ./.venv (created on first use)."""
+    if in_venv():
+        return
+    if not (ROOT / ".venv").exists():
+        print("Creating virtual environment in .venv …")
+        subprocess.run([sys.executable, "-m", "venv", str(ROOT / ".venv")], check=True)
+    python = venv_python()
+    os.execv(str(python), [str(python), *sys.argv])  # noqa: S606
 
 
-def find_port_process(port: int) -> str | None:
-    """Return a short description of the process listening on a port."""
-    try:
-        result = subprocess.run(
-            ["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except Exception:
-        return None
-
-    lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    if len(lines) >= 2:
-        return lines[1]
-    return None
+def install() -> None:
+    subprocess.run([sys.executable, "-m", "pip", "install", "-r", str(ROOT / "requirements.txt")], check=True)
 
 
-def port_is_available(port: int) -> bool:
-    """Check whether a TCP port is free on localhost."""
+def port_free(host: str, port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        return sock.connect_ex(("127.0.0.1", port)) != 0
+        return sock.connect_ex((host if host != "0.0.0.0" else "127.0.0.1", port)) != 0  # noqa: S104
 
-def start_webapp(port: int, open_browser: bool):
-    """Startet die Webapp."""
-    app_dir = Path(__file__).parent
-    os.chdir(app_dir)
 
-    if not port_is_available(port):
-        print(f"\n⚠️ Port {port} ist bereits belegt.")
-        proc = find_port_process(port)
-        if proc:
-            print(f"   Listener: {proc}")
-        print(f"   Starte z.B. mit: python run.py --port {port + 1}")
-        print(f"   Oder beende den Prozess auf Port {port} und versuche es erneut.")
-        return
-    
-    print(f"\n{'='*50}")
-    print(f"🚀 Person Intel Agent Webapp")
-    print(f"{'='*50}")
-    print(f"📡 URL: http://localhost:{port}")
-    print(f"🛑 Stoppen: Ctrl+C")
-    print(f"{'='*50}\n")
-    
-    if open_browser:
-        # Open browser after short delay
-        import threading
-        def open_browser_delayed():
-            time.sleep(2)
-            webbrowser.open(f"http://localhost:{port}")
-        threading.Thread(target=open_browser_delayed, daemon=True).start()
-    
-    # Start uvicorn
-    try:
-        subprocess.run([
-            sys.executable, "-m", "uvicorn",
-            "app.web:app",
-            "--host", "0.0.0.0",
-            "--port", str(port),
-            "--reload"
-        ], check=True)
-    except KeyboardInterrupt:
-        print("\n👋 Webapp gestoppt!")
-    except subprocess.CalledProcessError as e:
-        print(f"\n❌ Webapp konnte nicht gestartet werden (exit {e.returncode}).")
-
-def main():
-    configure_stdio()
-    parser = argparse.ArgumentParser(description="Person Intel Agent Webapp Starter")
-    parser.add_argument("--port", type=int, default=8000, help="Port (default: 8000)")
-    parser.add_argument("--no-browser", action="store_true", help="Browser nicht öffnen")
-    parser.add_argument("--install", action="store_true", help="Nur Dependencies installieren")
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Person Intel Agent starter")
+    parser.add_argument("--host", default=os.getenv("HOST", "127.0.0.1"))
+    parser.add_argument("--port", type=int, default=int(os.getenv("PORT", "8000")))
+    parser.add_argument("--no-browser", action="store_true")
+    parser.add_argument("--install", action="store_true", help="Install requirements and exit")
+    parser.add_argument("--dev", action="store_true", help="Enable auto-reload (development only)")
     args = parser.parse_args()
-    
-    check_venv()
-    
-    if args.install:
-        install_deps()
-        ensure_browser_binaries()
-        print("✅ Fertig! Starte mit: python run.py")
-        return
 
-    install_deps()
-    ensure_browser_binaries()
-    start_webapp(args.port, not args.no_browser)
+    ensure_venv()
+    if args.install:
+        install()
+        print("Done. Start with: python run.py")
+        return
+    try:
+        import fastapi  # noqa: F401
+        import uvicorn
+    except ImportError:
+        print("Dependencies missing — installing requirements …")
+        install()
+        import uvicorn
+
+    if not port_free(args.host, args.port):
+        print(f"Port {args.port} is already in use. Try: python run.py --port {args.port + 1}")
+        sys.exit(1)
+
+    url = f"http://{'127.0.0.1' if args.host in ('0.0.0.0', '::') else args.host}:{args.port}"  # noqa: S104
+    print(f"Person Intel Agent → {url}   (Ctrl+C to stop)")
+    if not args.no_browser:
+        def open_browser() -> None:
+            time.sleep(1.5)
+            webbrowser.open(url)
+
+        threading.Thread(target=open_browser, daemon=True).start()
+    os.chdir(ROOT)
+    uvicorn.run("app.api.app:app", host=args.host, port=args.port, reload=args.dev, server_header=False)
+
 
 if __name__ == "__main__":
     main()

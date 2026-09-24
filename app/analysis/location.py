@@ -11,6 +11,7 @@ Provides:
 """
 
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 
 # German cities → state → region → country

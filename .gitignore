@@ -5,3 +5,10 @@ output/
 test_data/
 *.egg-info/
 *.db
+data/
+.env
+*.db-wal
+*.db-shm
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/

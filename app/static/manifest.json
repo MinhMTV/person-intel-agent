@@ -1,7 +1,7 @@
 {
     "name": "Person Intel Agent",
     "short_name": "PersonIntel",
-    "description": "Automated OSINT Dossier Generator",
+    "description": "Image-first candidate discovery and verification",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#0f172a",
