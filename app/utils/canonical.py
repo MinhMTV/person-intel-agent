@@ -14,8 +14,23 @@ from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 _TRACKING_PARAMS = {
-    "fbclid", "gclid", "dclid", "msclkid", "igshid", "mc_cid", "mc_eid", "ref", "ref_src",
-    "ref_url", "si", "spm", "trk", "trkinfo", "originalsubdomain", "_hsenc", "_hsmi",
+    "fbclid",
+    "gclid",
+    "dclid",
+    "msclkid",
+    "igshid",
+    "mc_cid",
+    "mc_eid",
+    "ref",
+    "ref_src",
+    "ref_url",
+    "si",
+    "spm",
+    "trk",
+    "trkinfo",
+    "originalsubdomain",
+    "_hsenc",
+    "_hsmi",
 }
 _TRACKING_PREFIXES = ("utm_",)
 _IMAGE_SIZE_PARAMS = {"s", "size", "w", "h", "width", "height", "resize", "fit", "quality", "q", "v"}
@@ -29,8 +44,23 @@ _HOST_ALIASES = {
 }
 
 _MULTI_PART_TLDS = {
-    "co.uk", "org.uk", "ac.uk", "gov.uk", "com.au", "net.au", "co.at", "or.at", "ac.at",
-    "co.jp", "co.nz", "com.br", "com.cn", "co.in", "co.za", "com.mx", "com.tr",
+    "co.uk",
+    "org.uk",
+    "ac.uk",
+    "gov.uk",
+    "com.au",
+    "net.au",
+    "co.at",
+    "or.at",
+    "ac.at",
+    "co.jp",
+    "co.nz",
+    "com.br",
+    "com.cn",
+    "co.in",
+    "co.za",
+    "com.mx",
+    "com.tr",
 }
 
 
@@ -54,8 +84,7 @@ def canonical_url(url: str | None) -> str:
     if scheme not in ("http", "https"):
         return raw
     host = (parts.hostname or "").lower().rstrip(".")
-    if host.startswith("www."):
-        host = host[4:]
+    host = host.removeprefix("www.")
     host = _HOST_ALIASES.get(host, host)
     port = parts.port
     netloc = host if port in (None, 80, 443) else f"{host}:{port}"
@@ -93,8 +122,7 @@ def domain_of(url: str | None) -> str:
     except ValueError:
         return ""
     host = host.rstrip(".")
-    if host.startswith("www."):
-        host = host[4:]
+    host = host.removeprefix("www.")
     return _HOST_ALIASES.get(host, host)
 
 
@@ -124,8 +152,7 @@ def normalize_email(email: str | None) -> str:
     if not email:
         return ""
     value = email.strip().lower()
-    if value.startswith("mailto:"):
-        value = value[7:]
+    value = value.removeprefix("mailto:")
     if not re.fullmatch(r"[a-z0-9._%+'-]+@[a-z0-9.-]+\.[a-z]{2,}", value):
         return ""
     local, domain = value.split("@", 1)

@@ -64,8 +64,13 @@ def cosine_distance(a: np.ndarray, b: np.ndarray) -> tuple[float, float]:
 
 
 class FaceMatchingService:
-    def __init__(self, settings: Settings, backend: FaceBackend | None, cache: CacheStore | None = None,
-                 unavailable_reason: str | None = None):
+    def __init__(
+        self,
+        settings: Settings,
+        backend: FaceBackend | None,
+        cache: CacheStore | None = None,
+        unavailable_reason: str | None = None,
+    ):
         self.settings = settings
         self.backend = backend
         self.cache = cache
@@ -100,14 +105,21 @@ class FaceMatchingService:
         key = None
         if self.cache is not None and self.backend is not None:
             key = cache_key(
-                "face_embedding", sha256=image_sha256, backend=self.backend.name, model=self.backend.model,
+                "face_embedding",
+                sha256=image_sha256,
+                backend=self.backend.name,
+                model=self.backend.model,
                 detector=self.settings.face_detector,
             )
             cached = self.cache.get("face_embedding", key)
             if cached is not None:
                 return [
                     FaceObservation(
-                        x=f["x"], y=f["y"], w=f["w"], h=f["h"], confidence=f.get("c"),
+                        x=f["x"],
+                        y=f["y"],
+                        w=f["w"],
+                        h=f["h"],
+                        confidence=f.get("c"),
                         embedding=np.asarray(f["e"], dtype=np.float32) if f.get("e") is not None else None,
                     )
                     for f in cached
@@ -118,8 +130,14 @@ class FaceMatchingService:
                 "face_embedding",
                 key,
                 [
-                    {"x": f.x, "y": f.y, "w": f.w, "h": f.h, "c": f.confidence,
-                     "e": [round(float(v), 6) for v in f.embedding] if f.embedding is not None else None}
+                    {
+                        "x": f.x,
+                        "y": f.y,
+                        "w": f.w,
+                        "h": f.h,
+                        "c": f.confidence,
+                        "e": [round(float(v), 6) for v in f.embedding] if f.embedding is not None else None,
+                    }
                     for f in faces
                 ],
                 self.settings.cache_ttl_face_embedding,

@@ -32,12 +32,19 @@ from app.utils.canonical import registrable_domain
 from app.utils.platforms import source_quality
 
 _FACE_STRENGTH = {
-    FaceMatchBand.VERY_HIGH: 1.0, FaceMatchBand.HIGH: 0.8, FaceMatchBand.MEDIUM: 0.5,
-    FaceMatchBand.LOW: 0.15, FaceMatchBand.NO_MATCH: 0.0,
+    FaceMatchBand.VERY_HIGH: 1.0,
+    FaceMatchBand.HIGH: 0.8,
+    FaceMatchBand.MEDIUM: 0.5,
+    FaceMatchBand.LOW: 0.15,
+    FaceMatchBand.NO_MATCH: 0.0,
 }
 _TEXT_WEIGHTS = {
-    EvidenceType.KNOWN_URL: 0.8, EvidenceType.EMAIL_MATCH: 0.7, EvidenceType.USERNAME_MATCH: 0.6,
-    EvidenceType.EMPLOYER_MATCH: 0.25, EvidenceType.EDUCATION_MATCH: 0.25, EvidenceType.PROFESSION_MATCH: 0.1,
+    EvidenceType.KNOWN_URL: 0.8,
+    EvidenceType.EMAIL_MATCH: 0.7,
+    EvidenceType.USERNAME_MATCH: 0.6,
+    EvidenceType.EMPLOYER_MATCH: 0.25,
+    EvidenceType.EDUCATION_MATCH: 0.25,
+    EvidenceType.PROFESSION_MATCH: 0.1,
 }
 _CONTEXT = {EvidenceType.LOCATION_MATCH, EvidenceType.EMPLOYER_MATCH, EvidenceType.EDUCATION_MATCH}
 _IDENTIFIERS = {EvidenceType.USERNAME_MATCH, EvidenceType.EMAIL_MATCH, EvidenceType.KNOWN_URL}
@@ -68,20 +75,30 @@ class EvidenceFusionService:
         # --- image occurrence ---------------------------------------------------------
         image_types = [e.image.match_type for e in ev if e.image is not None and e.type != EvidenceType.FACE_SIMILARITY]
         image_occurrence = None
-        for t in (ImageMatchType.EXACT, ImageMatchType.PARTIAL, ImageMatchType.MODIFIED, ImageMatchType.VISUALLY_SIMILAR):
+        for t in (
+            ImageMatchType.EXACT,
+            ImageMatchType.PARTIAL,
+            ImageMatchType.MODIFIED,
+            ImageMatchType.VISUALLY_SIMILAR,
+        ):
             if t in image_types:
                 image_occurrence = t
                 break
         dims.image_occurrence_strength = {
-            ImageMatchType.EXACT: 1.0, ImageMatchType.PARTIAL: 0.75, ImageMatchType.MODIFIED: 0.75,
-            ImageMatchType.VISUALLY_SIMILAR: 0.2, None: 0.0,
+            ImageMatchType.EXACT: 1.0,
+            ImageMatchType.PARTIAL: 0.75,
+            ImageMatchType.MODIFIED: 0.75,
+            ImageMatchType.VISUALLY_SIMILAR: 0.2,
+            None: 0.0,
         }[image_occurrence]
         if dims.image_occurrence_strength >= 0.75:
             strong.append("IMAGE")
             first = _of(ev, EvidenceType.EXACT_IMAGE, EvidenceType.PARTIAL_IMAGE)[0]
             reasons.append(first.observation)
-            caveats.append("An image match shows that the PHOTO occurs on a page; it does not prove that every "
-                           "name on that page refers to the pictured person.")
+            caveats.append(
+                "An image match shows that the PHOTO occurs on a page; it does not prove that every "
+                "name on that page refers to the pictured person."
+            )
         elif image_occurrence == ImageMatchType.VISUALLY_SIMILAR:
             reasons.append("A visually similar (but different) image was found — weak on its own.")
             if candidate.best_face is None:
@@ -95,14 +112,20 @@ class EvidenceFusionService:
         dims.face_match_strength = _FACE_STRENGTH[face_band] if face_band else 0.0
         if face and face.match_band.rank >= FaceMatchBand.HIGH.rank:
             strong.append("FACE")
-            reasons.append(f"Face similarity {face.match_band.value.replace('_', ' ')} "
-                           f"({face.model}, cosine similarity {face.cosine_similarity:.3f}).")
-            caveats.append("Face similarity is not proof of identity — look-alikes exist and the bands are "
-                           "heuristic, not calibrated probabilities.")
+            reasons.append(
+                f"Face similarity {face.match_band.value.replace('_', ' ')} "
+                f"({face.model}, cosine similarity {face.cosine_similarity:.3f})."
+            )
+            caveats.append(
+                "Face similarity is not proof of identity — look-alikes exist and the bands are "
+                "heuristic, not calibrated probabilities."
+            )
         elif face and face.match_band == FaceMatchBand.MEDIUM:
             support += 1
-            reasons.append(f"Face similarity MEDIUM ({face.model}, cosine similarity {face.cosine_similarity:.3f}) — "
-                           "inconclusive on its own.")
+            reasons.append(
+                f"Face similarity MEDIUM ({face.model}, cosine similarity {face.cosine_similarity:.3f}) — "
+                "inconclusive on its own."
+            )
         if not face_matching_available:
             caveats.append("Face identity matching was unavailable for this run.")
 
@@ -128,7 +151,9 @@ class EvidenceFusionService:
         context = [e for e in ev if e.type in _CONTEXT and e.strength != EvidenceStrength.WEAK]
         if name_exact and context:
             strong.append("CONTEXT")
-            reasons.append(f"Full name matches together with {', '.join(sorted({e.type.value.split('_')[0].lower() for e in context}))}.")
+            reasons.append(
+                f"Full name matches together with {', '.join(sorted({e.type.value.split('_')[0].lower() for e in context}))}."
+            )
         elif name_exact:
             support += 1
             reasons.append("The full name matches (names are often shared by different people).")
@@ -139,8 +164,14 @@ class EvidenceFusionService:
             support += 1
 
         # --- cross-source ---------------------------------------------------------------------
-        independent = {registrable_domain(e.source_url) for e in ev if e.source_url and not (
-            e.type == EvidenceType.FACE_SIMILARITY and e.face and e.face.match_band.rank < FaceMatchBand.MEDIUM.rank)}
+        independent = {
+            registrable_domain(e.source_url)
+            for e in ev
+            if e.source_url
+            and not (
+                e.type == EvidenceType.FACE_SIMILARITY and e.face and e.face.match_band.rank < FaceMatchBand.MEDIUM.rank
+            )
+        }
         independent.discard("")
         cross_links = _of(ev, EvidenceType.CROSS_LINK)
         dims.cross_source_strength = 1.0 if len(independent) >= 3 else 0.5 if len(independent) == 2 else 0.0

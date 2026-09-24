@@ -86,6 +86,7 @@ def main() -> None:
     url = f"http://{'127.0.0.1' if args.host in ('0.0.0.0', '::') else args.host}:{args.port}"  # noqa: S104
     print(f"Person Intel Agent → {url}   (Ctrl+C to stop)")
     if not args.no_browser:
+
         def open_browser() -> None:
             time.sleep(1.5)
             webbrowser.open(url)

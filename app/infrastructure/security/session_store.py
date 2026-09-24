@@ -73,7 +73,7 @@ class SessionStore:
 
                 self._fernet = Fernet(settings.session_encryption_key.get_secret_value().encode())
             except Exception:
-                logger.error("SESSION_ENCRYPTION_KEY is invalid; session persistence disabled")
+                logger.exception("SESSION_ENCRYPTION_KEY is invalid; session persistence disabled")
         if self.persistent:
             self._load_all()
 
@@ -134,7 +134,10 @@ class SessionStore:
     def delete(self, platform: str) -> bool:
         with self._lock:
             existed = self._sessions.pop(platform, None) is not None
-            for path in (self.settings.session_dir / f"{platform}.session", self.settings.session_dir / f"{platform}.json"):
+            for path in (
+                self.settings.session_dir / f"{platform}.session",
+                self.settings.session_dir / f"{platform}.json",
+            ):
                 if path.exists():
                     path.unlink()
                     existed = True
@@ -144,7 +147,12 @@ class SessionStore:
         """Session status WITHOUT any cookie names/values."""
         config = PLATFORMS[platform]
         session = self._sessions.get(platform)
-        base = {"platform": platform, "name": config["name"], "persistent": self.persistent, "encrypted": self.encrypted}
+        base = {
+            "platform": platform,
+            "name": config["name"],
+            "persistent": self.persistent,
+            "encrypted": self.encrypted,
+        }
         if not session:
             return {**base, "status": "not_logged_in"}
         cookies = session["cookies"]

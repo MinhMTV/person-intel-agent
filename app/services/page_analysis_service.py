@@ -30,8 +30,12 @@ from app.utils.platforms import SOCIAL_DOMAINS, platform_for, username_from_url
 
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _TITLE_SPLIT = re.compile(r"\s+[|\-–—·•:]\s+")
-_BAD_IMAGE_HINTS = re.compile(r"(logo|icon|sprite|emoji|banner|badge|pixel|tracking|spacer|placeholder|default[-_]?avatar)", re.I)
-_GOOD_IMAGE_HINTS = re.compile(r"(avatar|profile|user|photo|portrait|headshot|author|member|team|people|staff|me\b)", re.I)
+_BAD_IMAGE_HINTS = re.compile(
+    r"(logo|icon|sprite|emoji|banner|badge|pixel|tracking|spacer|placeholder|default[-_]?avatar)", re.IGNORECASE
+)
+_GOOD_IMAGE_HINTS = re.compile(
+    r"(avatar|profile|user|photo|portrait|headshot|author|member|team|people|staff|me\b)", re.IGNORECASE
+)
 _EXCERPT_LIMIT = 6000
 
 
@@ -164,12 +168,16 @@ def parse_html(html: str, base_url: str, max_images: int) -> tuple[PageProfile, 
         if not src and srcset:
             src = srcset.split(",")[-1].strip().split(" ")[0]
         src = src.strip()
-        if not src or src.startswith("data:") or re.search(r"\.(svg|gif|ico)(\?|$)", src, re.I):
+        if not src or src.startswith("data:") or re.search(r"\.(svg|gif|ico)(\?|$)", src, re.IGNORECASE):
             continue
         classes: Any = tag.get("class") or []
         descriptor = " ".join(
-            (src, _attr(tag, "alt") or "", " ".join(classes) if isinstance(classes, list) else str(classes),
-             _attr(tag, "id") or "")
+            (
+                src,
+                _attr(tag, "alt") or "",
+                " ".join(classes) if isinstance(classes, list) else str(classes),
+                _attr(tag, "id") or "",
+            )
         )
         if _BAD_IMAGE_HINTS.search(descriptor):
             continue
@@ -186,7 +194,9 @@ def parse_html(html: str, base_url: str, max_images: int) -> tuple[PageProfile, 
         if (width or 0) >= 150 or (height or 0) >= 150:
             priority += 0.1
         priority = min(priority, 0.85)  # explicit profile metadata (JSON-LD / OpenGraph) ranks first
-        images.append(ImageSpec(urljoin(base_url, src), ImageOrigin.AVATAR if priority >= 0.6 else ImageOrigin.INLINE, priority))
+        images.append(
+            ImageSpec(urljoin(base_url, src), ImageOrigin.AVATAR if priority >= 0.6 else ImageOrigin.INLINE, priority)
+        )
 
     body_text = _text(soup.body or soup)
     for a in soup.find_all("a", href=True)[:400]:
@@ -243,9 +253,18 @@ def _int(value: Any) -> int | None:
 
 def _is_boilerplate_email(email: str) -> bool:
     local = email.split("@", 1)[0].lower()
-    return local in {"noreply", "no-reply", "info", "support", "privacy", "abuse", "press", "hello", "contact", "webmaster"} or (
-        email.lower().endswith(("example.com", "sentry.io", "wixpress.com"))
-    )
+    return local in {
+        "noreply",
+        "no-reply",
+        "info",
+        "support",
+        "privacy",
+        "abuse",
+        "press",
+        "hello",
+        "contact",
+        "webmaster",
+    } or (email.lower().endswith(("example.com", "sentry.io", "wixpress.com")))
 
 
 class PageAnalysisService:
@@ -273,14 +292,20 @@ class PageAnalysisService:
                 )
                 profile.status_code = result.status_code
             except FetchError as exc:
-                profile = PageProfile(fetched=False, fetch_error=f"{exc.code}: {exc.message}"[:160],
-                                      status_code=exc.status_code)
+                profile = PageProfile(
+                    fetched=False, fetch_error=f"{exc.code}: {exc.message}"[:160], status_code=exc.status_code
+                )
                 specs = []
-            if self.cache is not None and (profile.fetched or profile.fetch_error and "http_error" in profile.fetch_error):
+            if self.cache is not None and (
+                profile.fetched or (profile.fetch_error and "http_error" in profile.fetch_error)
+            ):
                 self.cache.set(
-                    "page", key,
-                    {"profile": profile.model_dump(mode="json"),
-                     "images": [{"url": s.url, "origin": s.origin.value, "priority": s.priority} for s in specs]},
+                    "page",
+                    key,
+                    {
+                        "profile": profile.model_dump(mode="json"),
+                        "images": [{"url": s.url, "origin": s.origin.value, "priority": s.priority} for s in specs],
+                    },
                     self.settings.cache_ttl_page,
                 )
         if profile.fetched:
@@ -307,7 +332,11 @@ class PageAnalysisService:
             known.add(canon)
             page.images.append(
                 CandidateImage(
-                    id=stable_hash([page.id, canon], 12), url=spec.url, canonical_url=canon, page_url=page.url,
-                    origin=spec.origin, priority=spec.priority,
+                    id=stable_hash([page.id, canon], 12),
+                    url=spec.url,
+                    canonical_url=canon,
+                    page_url=page.url,
+                    origin=spec.origin,
+                    priority=spec.priority,
                 )
             )

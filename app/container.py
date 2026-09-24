@@ -107,8 +107,14 @@ def build_container(
     if face_backend is _UNSET:
         backend, reason = build_face_backend(settings)
     else:
-        backend, reason = face_backend, (None if face_backend is not None and face_backend.supports_embeddings
-                                         else "Face identity matching is unavailable.")
+        backend, reason = (
+            face_backend,
+            (
+                None
+                if face_backend is not None and face_backend.supports_embeddings
+                else "Face identity matching is unavailable."
+            ),
+        )
     faces = FaceMatchingService(settings, backend, cache, unavailable_reason=reason)
     if reverse_providers is None:
         reverse_providers = [

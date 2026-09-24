@@ -36,7 +36,6 @@ class PlannedQuery:
 class DiscoveryOutcome:
     hits: list[WebSearchHit] = field(default_factory=list)
     profiles: list[ProfileRecord] = field(default_factory=list)
-    entity_queries: list[str] = field(default_factory=list)
 
 
 def _looks_like_person_name(text: str) -> bool:
@@ -69,7 +68,11 @@ class QueryPlanner:
             country_code = None
             if hints.location:
                 country_code = expand_location(hints.location).country_code
-            if (country_code in _DACH) or (hints.country or "").upper() in _DACH | {"GERMANY", "AUSTRIA", "SWITZERLAND"}:
+            if (country_code in _DACH) or (hints.country or "").upper() in _DACH | {
+                "GERMANY",
+                "AUSTRIA",
+                "SWITZERLAND",
+            }:
                 add(f"{quoted} site:xing.com/profile", "xing")
             add(f"{quoted} site:github.com", "github")
         for username in hints.usernames[:3]:
@@ -105,27 +108,41 @@ class CandidateDiscoveryService:
         self.cache = cache
         self.planner = QueryPlanner(settings.max_search_queries)
 
-    async def _search(self, provider: WebSearchProvider, planned: PlannedQuery, ctx: RunContext) -> list[WebSearchHit] | None:
+    async def _search(
+        self, provider: WebSearchProvider, planned: PlannedQuery, ctx: RunContext
+    ) -> list[WebSearchHit] | None:
         key = cache_key("web_search", provider=provider.name, query=planned.query)
         if self.cache is not None:
             cached = self.cache.get("web_search", key)
             ctx.cache(cached is not None)
             if cached is not None:
                 cached_hits = [WebSearchHit.model_validate(h) for h in cached]
-                ctx.record_run(ProviderRun(provider=provider.name, stage="web_search", cache_hit=True,
-                                           outcome=ProviderOutcome.SUCCESS if cached_hits else ProviderOutcome.NO_RESULTS,
-                                           result_count=len(cached_hits), detail=planned.query))
+                ctx.record_run(
+                    ProviderRun(
+                        provider=provider.name,
+                        stage="web_search",
+                        cache_hit=True,
+                        outcome=ProviderOutcome.SUCCESS if cached_hits else ProviderOutcome.NO_RESULTS,
+                        result_count=len(cached_hits),
+                        detail=planned.query,
+                    )
+                )
                 return cached_hits
         hits, run = await run_provider(
-            provider.name, "web_search", lambda: provider.search(planned.query, limit=10),
-            timeout=self.settings.http_timeout_seconds + 5, detail=planned.query,
+            provider.name,
+            "web_search",
+            lambda: provider.search(planned.query, limit=10),
+            timeout=self.settings.http_timeout_seconds + 5,
+            detail=planned.query,
         )
         ctx.record_run(run)
         if hits is not None and self.cache is not None:
             self.cache.set("web_search", key, [h.model_dump() for h in hits], self.settings.cache_ttl_web_search)
         return hits
 
-    async def _query_with_fallback(self, planned: PlannedQuery, ctx: RunContext, sem: asyncio.Semaphore) -> list[WebSearchHit]:
+    async def _query_with_fallback(
+        self, planned: PlannedQuery, ctx: RunContext, sem: asyncio.Semaphore
+    ) -> list[WebSearchHit]:
         async with sem:
             for provider in self.search_providers:
                 if not provider.is_configured():
@@ -142,30 +159,45 @@ class CandidateDiscoveryService:
             ctx.cache(cached is not None)
             if cached is not None:
                 cached_records = [ProfileRecord.model_validate(r) for r in cached]
-                ctx.record_run(ProviderRun(provider=provider.name, stage="profile_lookup", cache_hit=True,
-                                           outcome=ProviderOutcome.SUCCESS if cached_records else ProviderOutcome.NO_RESULTS,
-                                           result_count=len(cached_records)))
+                ctx.record_run(
+                    ProviderRun(
+                        provider=provider.name,
+                        stage="profile_lookup",
+                        cache_hit=True,
+                        outcome=ProviderOutcome.SUCCESS if cached_records else ProviderOutcome.NO_RESULTS,
+                        result_count=len(cached_records),
+                    )
+                )
                 return cached_records
         records, run = await run_provider(
-            provider.name, "profile_lookup", lambda: provider.lookup(hints), timeout=self.settings.http_timeout_seconds * 2
+            provider.name,
+            "profile_lookup",
+            lambda: provider.lookup(hints),
+            timeout=self.settings.http_timeout_seconds * 2,
         )
         ctx.record_run(run)
         if records is not None and self.cache is not None:
             self.cache.set("profile", key, [r.model_dump() for r in records], self.settings.cache_ttl_web_search)
         return records or []
 
-    async def discover(self, hints: IdentityHints, ctx: RunContext, entities: list[WebEntity] | None = None) -> DiscoveryOutcome:
+    async def discover(
+        self, hints: IdentityHints, ctx: RunContext, entities: list[WebEntity] | None = None
+    ) -> DiscoveryOutcome:
         outcome = DiscoveryOutcome()
         plan = self.planner.plan(hints, entities) if ctx.options.use_web_search else []
-        outcome.entity_queries = [p.query for p in plan if p.purpose == "web_entity"]
         profile_providers = (
             [p for p in self.profile_providers if p.is_configured() and p.applicable(hints)]
-            if ctx.options.use_profile_providers else []
+            if ctx.options.use_profile_providers
+            else []
         )
         if not plan and not profile_providers:
             return outcome
-        ctx.emit(EventType.CANDIDATE_SEARCH_STARTED, "Parameter-assisted search started",
-                 queries=[p.query for p in plan], profile_providers=[p.name for p in profile_providers])
+        ctx.emit(
+            EventType.CANDIDATE_SEARCH_STARTED,
+            "Parameter-assisted search started",
+            queries=[p.query for p in plan],
+            profile_providers=[p.name for p in profile_providers],
+        )
         if plan and not any(p.is_configured() for p in self.search_providers):
             ctx.warn("No web search provider is available (SearXNG/DuckDuckGo).")
         sem = asyncio.Semaphore(3)

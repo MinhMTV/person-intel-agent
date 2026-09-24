@@ -13,15 +13,21 @@ from app.utils.platforms import platform_for, source_quality, username_from_url
 
 
 def test_canonical_url_strips_noise():
-    assert canonical_url("HTTP://WWW.Example.com:80/Path/?utm_source=x&b=2&a=1#frag") == "https://example.com/Path?a=1&b=2"
+    assert (
+        canonical_url("HTTP://WWW.Example.com:80/Path/?utm_source=x&b=2&a=1#frag") == "https://example.com/Path?a=1&b=2"
+    )
     assert canonical_url("https://example.com/a/") == canonical_url("https://example.com/a")
     assert canonical_url("https://twitter.com/jane") == canonical_url("https://x.com/jane")
-    assert canonical_url("https://de.linkedin.com/in/Jane-Doe-123/details/") == "https://de.linkedin.com/in/jane-doe-123"
+    assert (
+        canonical_url("https://de.linkedin.com/in/Jane-Doe-123/details/") == "https://de.linkedin.com/in/jane-doe-123"
+    )
     assert canonical_url("javascript:alert(1)") == "javascript:alert(1)"  # never turned into http
 
 
 def test_canonical_image_url_drops_size_params():
-    assert canonical_image_url("https://avatars.example.com/u/1?s=400&v=4") == canonical_image_url("https://avatars.example.com/u/1?s=80")
+    assert canonical_image_url("https://avatars.example.com/u/1?s=400&v=4") == canonical_image_url(
+        "https://avatars.example.com/u/1?s=80"
+    )
 
 
 def test_domains():

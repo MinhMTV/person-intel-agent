@@ -81,8 +81,11 @@ class CandidateImageService:
             return _Processed(CandidateImageStatus.FAILED, error=f"{exc.code}: {exc.message}"[:160])
         try:
             validated = await asyncio.to_thread(
-                validate_image_bytes, fetched.content, max_bytes=self.settings.max_remote_image_bytes,
-                max_pixels=self.settings.max_image_pixels, min_dimension=48,
+                validate_image_bytes,
+                fetched.content,
+                max_bytes=self.settings.max_remote_image_bytes,
+                max_pixels=self.settings.max_image_pixels,
+                min_dimension=48,
                 max_dimension=self.settings.max_image_dimension,
             )
         except ImageValidationError as exc:
@@ -100,9 +103,15 @@ class CandidateImageService:
             if existing is not None:
                 ctx.stats.images_deduplicated += 1
                 return _Processed(
-                    CandidateImageStatus.DUPLICATE if existing.status != CandidateImageStatus.FAILED else existing.status,
-                    sha256=validated.original_sha256, phash=image_phash, width=validated.width,
-                    height=validated.height, faces=existing.faces, duplicate_of=existing.sha256,
+                    CandidateImageStatus.DUPLICATE
+                    if existing.status != CandidateImageStatus.FAILED
+                    else existing.status,
+                    sha256=validated.original_sha256,
+                    phash=image_phash,
+                    width=validated.width,
+                    height=validated.height,
+                    faces=existing.faces,
+                    duplicate_of=existing.sha256,
                 )
             placeholder = _Processed(CandidateImageStatus.PENDING, sha256=validated.original_sha256, phash=image_phash)
             by_sha[validated.original_sha256] = placeholder
@@ -130,7 +139,7 @@ class CandidateImageService:
         placeholder.status = CandidateImageStatus.ANALYZED if faces else CandidateImageStatus.NO_FACE
         placeholder.faces = faces
         placeholder.width, placeholder.height = validated.width, validated.height
-        ctx.emit(EventType.CANDIDATE_IMAGE_DOWNLOADED, f"Image analysed: {len(faces)} face(s)",
-                 url=url, faces=len(faces))
+        ctx.emit(
+            EventType.CANDIDATE_IMAGE_DOWNLOADED, f"Image analysed: {len(faces)} face(s)", url=url, faces=len(faces)
+        )
         return placeholder
-

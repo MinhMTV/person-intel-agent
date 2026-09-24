@@ -119,7 +119,6 @@ class CandidateImageStatus(str, Enum):
     NO_FACE = "NO_FACE"
     FAILED = "FAILED"
     DUPLICATE = "DUPLICATE"
-    SKIPPED = "SKIPPED"
 
 
 class CandidateImage(BaseModel):

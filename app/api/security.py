@@ -52,8 +52,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             if request.method in ("POST", "PUT", "PATCH", "DELETE"):
                 client = request.client.host if request.client else "unknown"
                 if not self.limiter.allow(client):
-                    return JSONResponse({"detail": "Too many requests"}, status_code=429,
-                                        headers={"Retry-After": "60"})
+                    return JSONResponse({"detail": "Too many requests"}, status_code=429, headers={"Retry-After": "60"})
         try:
             response = await call_next(request)
         except Exception:

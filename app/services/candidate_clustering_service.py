@@ -106,7 +106,7 @@ class CandidateClusteringService:
         emails = {normalize_email(e) for e in pa.profile.emails} & {normalize_email(e) for e in pb.profile.emails}
         emails.discard("")
         if emails:
-            link.strong.append(f"both list the email {sorted(emails)[0]}")
+            link.strong.append(f"both list the email {min(emails)}")
         for x, y in ((pa, pb), (pb, pa)):
             y_domain = registrable_domain(y.url)
             if platform_for(y.url) is None and y_domain not in SOCIAL_DOMAINS:
@@ -116,7 +116,7 @@ class CandidateClusteringService:
 
         handles = {u for u in pa.profile.usernames if len(u) >= 4} & {u for u in pb.profile.usernames if len(u) >= 4}
         if handles:
-            link.moderate.append(("username", f"same handle “{sorted(handles)[0]}”"))
+            link.moderate.append(("username", f"same handle “{min(handles)}”"))
         na, nb = normalize_name(pa.profile.profile_name), normalize_name(pb.profile.profile_name)
         if na and na == nb and len(name_tokens(na)) >= 2:
             link.moderate.append(("name", f"same profile name “{pa.profile.profile_name}”"))
@@ -128,13 +128,19 @@ class CandidateClusteringService:
             cmp = self.faces.compare(a.best_face_embedding, b.best_face_embedding)
             if cmp.band.rank >= FaceMatchBand.HIGH.rank:
                 link.moderate.append(("face", f"their photos show {cmp.band.value} face similarity to each other"))
-        orgs = {normalize_text(o) for o in pa.profile.organizations} & {normalize_text(o) for o in pb.profile.organizations}
+        orgs = {normalize_text(o) for o in pa.profile.organizations} & {
+            normalize_text(o) for o in pb.profile.organizations
+        }
         orgs.discard("")
         if orgs:
-            link.moderate.append(("organization", f"same organisation “{sorted(orgs)[0]}”"))
+            link.moderate.append(("organization", f"same organisation “{min(orgs)}”"))
         locs = {normalize_text(o) for o in pa.profile.locations} & {normalize_text(o) for o in pb.profile.locations}
-        loc_ev_a = {e.text.expected for e in a.evidence if e.type == EvidenceType.LOCATION_MATCH and e.text and e.text.exact}
-        loc_ev_b = {e.text.expected for e in b.evidence if e.type == EvidenceType.LOCATION_MATCH and e.text and e.text.exact}
+        loc_ev_a = {
+            e.text.expected for e in a.evidence if e.type == EvidenceType.LOCATION_MATCH and e.text and e.text.exact
+        }
+        loc_ev_b = {
+            e.text.expected for e in b.evidence if e.type == EvidenceType.LOCATION_MATCH and e.text and e.text.exact
+        }
         locs.discard("")
         if locs or (loc_ev_a & loc_ev_b):
             link.moderate.append(("location", "compatible location"))
@@ -169,7 +175,9 @@ class CandidateClusteringService:
         for members in groups.values():
             member_set = set(members)
             group_links = [(i, j, lk) for (i, j), lk in reasons.items() if i in member_set and j in member_set]
-            candidates.append(self._build([nodes[i] for i in members], [(nodes[i], nodes[j], lk) for i, j, lk in group_links]))
+            candidates.append(
+                self._build([nodes[i] for i in members], [(nodes[i], nodes[j], lk) for i, j, lk in group_links])
+            )
         return candidates
 
     def _build(self, members: list[PageNode], links: list[tuple[PageNode, PageNode, Link]]) -> CandidateIdentity:
@@ -182,8 +190,13 @@ class CandidateClusteringService:
         for a, b, lk in links:
             if lk.strong:
                 for text in lk.strong:
-                    ev = make_evidence(EvidenceType.CROSS_LINK, EvidenceStrength.STRONG,
-                                       f"Explicit connection: {text}.", a.page.url, related_url=b.page.url)
+                    ev = make_evidence(
+                        EvidenceType.CROSS_LINK,
+                        EvidenceStrength.STRONG,
+                        f"Explicit connection: {text}.",
+                        a.page.url,
+                        related_url=b.page.url,
+                    )
                     evidence.setdefault(ev.id, ev)
             descr = "; ".join(lk.strong + [d for _, d in lk.moderate])
             cluster_reasons.append(f"{_label(a.page)} ↔ {_label(b.page)}: {descr}")

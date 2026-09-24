@@ -46,19 +46,35 @@ class WikidataProfileProvider(ProfileProvider):
         headers = {"User-Agent": self.settings.http_user_agent}
         resp = await self.client.get(
             API,
-            params={"action": "wbsearchentities", "search": hints.name, "language": "en", "type": "item",
-                    "format": "json", "limit": self.max_entities},
+            params={
+                "action": "wbsearchentities",
+                "search": hints.name,
+                "language": "en",
+                "type": "item",
+                "format": "json",
+                "limit": self.max_entities,
+            },
             headers=headers,
         )
         check_response(resp, self.name)
         data = json_or_raise(resp, self.name)
-        ids = [e["id"] for e in (data.get("search") or []) if isinstance(e, dict) and e.get("id")] if isinstance(data, dict) else []
+        ids = (
+            [e["id"] for e in (data.get("search") or []) if isinstance(e, dict) and e.get("id")]
+            if isinstance(data, dict)
+            else []
+        )
         if not ids:
             return []
         resp = await self.client.get(
             API,
-            params={"action": "wbgetentities", "ids": "|".join(ids), "props": "labels|descriptions|claims|sitelinks",
-                    "languages": "en|de", "sitefilter": "enwiki|dewiki", "format": "json"},
+            params={
+                "action": "wbgetentities",
+                "ids": "|".join(ids),
+                "props": "labels|descriptions|claims|sitelinks",
+                "languages": "en|de",
+                "sitefilter": "enwiki|dewiki",
+                "format": "json",
+            },
             headers=headers,
         )
         check_response(resp, self.name)
@@ -70,14 +86,17 @@ class WikidataProfileProvider(ProfileProvider):
             claims = entity.get("claims") or {}
             if HUMAN not in _claim_ids(claims, "P31"):
                 continue
-            label = ((entity.get("labels") or {}).get("en") or (entity.get("labels") or {}).get("de") or {}).get("value")
+            label = ((entity.get("labels") or {}).get("en") or (entity.get("labels") or {}).get("de") or {}).get(
+                "value"
+            )
             desc = ((entity.get("descriptions") or {}).get("en") or {}).get("value")
             images = _claim_ids(claims, "P18")
             sitelinks = entity.get("sitelinks") or {}
             wiki = sitelinks.get("enwiki") or sitelinks.get("dewiki")
             page_url = (
                 f"https://{'en' if 'enwiki' in sitelinks else 'de'}.wikipedia.org/wiki/{quote(wiki['title'].replace(' ', '_'))}"
-                if wiki else f"https://www.wikidata.org/wiki/{entity_id}"
+                if wiki
+                else f"https://www.wikidata.org/wiki/{entity_id}"
             )
             records.append(
                 ProfileRecord(
@@ -88,7 +107,8 @@ class WikidataProfileProvider(ProfileProvider):
                     bio=desc,
                     avatar_url=(
                         f"https://commons.wikimedia.org/wiki/Special:FilePath/{quote(images[0].replace(' ', '_'))}?width=600"
-                        if images else None
+                        if images
+                        else None
                     ),
                     linked_urls=[f"https://www.wikidata.org/wiki/{entity_id}"],
                     lookup=f"name:{hints.name}",

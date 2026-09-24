@@ -31,19 +31,6 @@ class EvidenceType(str, Enum):
     CROSS_LINK = "CROSS_LINK"
 
 
-IMAGE_EVIDENCE = {EvidenceType.EXACT_IMAGE, EvidenceType.PARTIAL_IMAGE, EvidenceType.SIMILAR_IMAGE}
-TEXT_EVIDENCE = {
-    EvidenceType.NAME_MATCH,
-    EvidenceType.USERNAME_MATCH,
-    EvidenceType.LOCATION_MATCH,
-    EvidenceType.EMAIL_MATCH,
-    EvidenceType.EMPLOYER_MATCH,
-    EvidenceType.EDUCATION_MATCH,
-    EvidenceType.PROFESSION_MATCH,
-    EvidenceType.KNOWN_URL,
-}
-
-
 class EvidenceStrength(str, Enum):
     STRONG = "STRONG"
     MODERATE = "MODERATE"

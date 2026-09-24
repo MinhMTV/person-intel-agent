@@ -58,7 +58,9 @@ class LeadService:
         self.settings = settings
         self.client = client
 
-    async def collect(self, hints: IdentityHints, pages: list[CandidatePage], candidates: list[CandidateIdentity]) -> list[Lead]:
+    async def collect(
+        self, hints: IdentityHints, pages: list[CandidatePage], candidates: list[CandidateIdentity]
+    ) -> list[Lead]:
         leads: dict[tuple[str, str], Lead] = {}
         page_to_candidate = {pid: c.id for c in candidates for pid in c.page_ids}
 
@@ -71,34 +73,68 @@ class LeadService:
                 existing.candidate_ids = sorted(set(existing.candidate_ids) | set(lead.candidate_ids))
 
         for email in hints.emails:
-            add(Lead(kind=LeadKind.EMAIL, value=email, status=LeadStatus.PROVIDED, classification="PROVIDED_EMAIL",
-                     note="Supplied by the investigator."))
+            add(
+                Lead(
+                    kind=LeadKind.EMAIL,
+                    value=email,
+                    status=LeadStatus.PROVIDED,
+                    classification="PROVIDED_EMAIL",
+                    note="Supplied by the investigator.",
+                )
+            )
         for page in pages:
             cid = page_to_candidate.get(page.id)
             for email in page.profile.emails:
-                add(Lead(kind=LeadKind.EMAIL, value=email, status=LeadStatus.OBSERVED, classification="OBSERVED_EMAIL",
-                         source_url=page.url, candidate_ids=[cid] if cid else [],
-                         note="Seen on a candidate source (the address may belong to someone else on that page)."))
+                add(
+                    Lead(
+                        kind=LeadKind.EMAIL,
+                        value=email,
+                        status=LeadStatus.OBSERVED,
+                        classification="OBSERVED_EMAIL",
+                        source_url=page.url,
+                        candidate_ids=[cid] if cid else [],
+                        note="Seen on a candidate source (the address may belong to someone else on that page).",
+                    )
+                )
             for link in page.profile.social_links:
                 domain = registrable_domain(link)
                 if domain and domain not in SOCIAL_DOMAINS and platform_for(link) is None:
-                    add(Lead(kind=LeadKind.DOMAIN, value=domain, status=LeadStatus.OBSERVED,
-                             classification="LINKED_PERSONAL_DOMAIN", source_url=page.url,
-                             candidate_ids=[cid] if cid else [],
-                             note="Linked from a candidate profile; ownership is not verified."))
+                    add(
+                        Lead(
+                            kind=LeadKind.DOMAIN,
+                            value=domain,
+                            status=LeadStatus.OBSERVED,
+                            classification="LINKED_PERSONAL_DOMAIN",
+                            source_url=page.url,
+                            candidate_ids=[cid] if cid else [],
+                            note="Linked from a candidate profile; ownership is not verified.",
+                        )
+                    )
 
         if self.settings.generate_email_candidates:
             for email in generate_email_candidates(hints.name):
                 if (LeadKind.EMAIL.value, email) not in leads:
-                    add(Lead(kind=LeadKind.EMAIL, value=email, status=LeadStatus.GENERATED_CANDIDATE,
-                             classification="GENERATED_EMAIL_CANDIDATE",
-                             note="Hypothesis generated from the name pattern — NOT a discovery."))
+                    add(
+                        Lead(
+                            kind=LeadKind.EMAIL,
+                            value=email,
+                            status=LeadStatus.GENERATED_CANDIDATE,
+                            classification="GENERATED_EMAIL_CANDIDATE",
+                            note="Hypothesis generated from the name pattern — NOT a discovery.",
+                        )
+                    )
         if self.settings.generate_domain_candidates:
             for domain in generate_domain_candidates(hints.name):
                 if await self._domain_resolves(domain):
-                    add(Lead(kind=LeadKind.DOMAIN, value=domain, status=LeadStatus.GENERATED_CANDIDATE,
-                             classification="DOMAIN_EXISTS_UNVERIFIED",
-                             note="The domain exists. Nothing links it to this person unless a candidate profile does."))
+                    add(
+                        Lead(
+                            kind=LeadKind.DOMAIN,
+                            value=domain,
+                            status=LeadStatus.GENERATED_CANDIDATE,
+                            classification="DOMAIN_EXISTS_UNVERIFIED",
+                            note="The domain exists. Nothing links it to this person unless a candidate profile does.",
+                        )
+                    )
 
         email_leads = [lead for lead in leads.values() if lead.kind == LeadKind.EMAIL]
         if self.settings.hibp_api_key:
@@ -106,7 +142,9 @@ class LeadService:
         if self.settings.smtp_verification_enabled:
             for lead in email_leads[:6]:
                 if await asyncio.to_thread(self._smtp_accepts, lead.value):
-                    lead.note = (lead.note or "") + " SMTP server accepted the recipient (servers often accept any address)."
+                    lead.note = (
+                        lead.note or ""
+                    ) + " SMTP server accepted the recipient (servers often accept any address)."
                     if lead.status == LeadStatus.GENERATED_CANDIDATE:
                         lead.status, lead.classification = LeadStatus.VERIFIED, "VERIFIED_EMAIL"
         return list(leads.values())
@@ -124,7 +162,10 @@ class LeadService:
         try:
             resp = await self.client.get(
                 f"https://haveibeenpwned.com/api/v3/breachedaccount/{quote(lead.value)}",
-                headers={"hibp-api-key": self.settings.hibp_api_key.get_secret_value(), "user-agent": "PersonIntelAgent"},
+                headers={
+                    "hibp-api-key": self.settings.hibp_api_key.get_secret_value(),
+                    "user-agent": "PersonIntelAgent",
+                },
                 params={"truncateResponse": "true"},
             )
         except httpx.HTTPError:
@@ -150,7 +191,7 @@ class LeadService:
         domain = email.split("@", 1)[1]
         try:
             answers = dns.resolver.resolve(domain, "MX", lifetime=timeout)
-            host = str(sorted(answers, key=lambda r: r.preference)[0].exchange).rstrip(".")
+            host = str(min(answers, key=lambda r: r.preference).exchange).rstrip(".")
             with smtplib.SMTP(host, 25, timeout=timeout) as smtp:
                 smtp.ehlo_or_helo_if_needed()
                 smtp.mail("verify@invalid.example")

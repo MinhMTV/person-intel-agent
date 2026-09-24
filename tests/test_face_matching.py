@@ -35,7 +35,11 @@ def test_compare_keeps_raw_measurements(tmp_path):
 
 def test_multiple_references_use_second_best_with_three_or_more(tmp_path):
     s = service(tmp_path)
-    refs = [ReferenceFace("r1", "f1", unit(1.0)), ReferenceFace("r2", "f1", unit(0.2)), ReferenceFace("r3", "f1", unit(0.1))]
+    refs = [
+        ReferenceFace("r1", "f1", unit(1.0)),
+        ReferenceFace("r2", "f1", unit(0.2)),
+        ReferenceFace("r3", "f1", unit(0.1)),
+    ]
     cmp, best = s.compare_multiple_references(refs, unit(1.0))
     assert best.reference_image_id == "r1"
     assert cmp.references_compared == 3

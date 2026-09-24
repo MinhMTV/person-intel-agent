@@ -21,8 +21,8 @@ from app.vision.image_validation import ImageValidationError
 router = APIRouter(prefix="/api/investigations", tags=["investigations"])
 
 
-def investigation_view(inv: Investigation, *, include_result: bool = True) -> dict[str, Any]:
-    data = inv.model_dump(mode="json", exclude={"result"} if not include_result else None)
+def investigation_view(inv: Investigation) -> dict[str, Any]:
+    data = inv.model_dump(mode="json")
     data["title"] = inv.title
     return data
 
@@ -50,7 +50,9 @@ def _hints_from_form(**fields: Any) -> IdentityHints:
         raise HTTPException(status_code=422, detail=json.loads(exc.json(include_url=False))) from exc
 
 
-async def add_images(c: Container, inv_id: str, images: list[UploadFile]) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
+async def add_images(
+    c: Container, inv_id: str, images: list[UploadFile]
+) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
     added, errors = [], []
     for upload in images:
         if not upload.filename and not upload.size:
@@ -89,9 +91,19 @@ async def create_investigation(
     but at least one of them must be supplied. Set ``start=true`` to run immediately."""
     if len(images) > c.settings.max_reference_images:
         raise HTTPException(status_code=400, detail=f"At most {c.settings.max_reference_images} images are allowed.")
-    hints = _hints_from_form(name=name, location=location, country=country, age_min=age_min, age_max=age_max,
-                             usernames=usernames, emails=emails, employer=employer, university=university,
-                             profession=profession, known_urls=known_urls)
+    hints = _hints_from_form(
+        name=name,
+        location=location,
+        country=country,
+        age_min=age_min,
+        age_max=age_max,
+        usernames=usernames,
+        emails=emails,
+        employer=employer,
+        university=university,
+        profession=profession,
+        known_urls=known_urls,
+    )
     inv = c.investigations.create(hints)
     added, errors = await add_images(c, inv.id, images)
     if not added and hints.is_empty():
@@ -106,7 +118,9 @@ async def create_investigation(
 
 @router.get("")
 async def list_investigations(
-    limit: int = Query(50, ge=1, le=500), tag: str | None = None, q: str | None = None,
+    limit: int = Query(50, ge=1, le=500),
+    tag: str | None = None,
+    q: str | None = None,
     c: Container = Depends(get_container),
 ) -> dict[str, Any]:
     items = c.investigations.list_investigations(limit=limit, tag=tag, query=q)
@@ -124,7 +138,9 @@ async def get_investigation(investigation_id: str, c: Container = Depends(get_co
 
 
 @router.patch("/{investigation_id}")
-async def update_investigation(investigation_id: str, body: dict = Body(...), c: Container = Depends(get_container)) -> dict[str, Any]:
+async def update_investigation(
+    investigation_id: str, body: dict = Body(...), c: Container = Depends(get_container)
+) -> dict[str, Any]:
     inv = load_investigation(c, investigation_id, with_result=False)
     ensure_not_running(c, inv)
     try:
@@ -163,8 +179,11 @@ async def run_investigation(investigation_id: str, c: Container = Depends(get_co
 
 @router.get("/{investigation_id}/events")
 async def investigation_events(
-    investigation_id: str, request: Request, after: int = Query(0, ge=0),
-    last_event_id: str | None = Header(None), c: Container = Depends(get_container),
+    investigation_id: str,
+    request: Request,
+    after: int = Query(0, ge=0),
+    last_event_id: str | None = Header(None),
+    c: Container = Depends(get_container),
 ) -> StreamingResponse:
     """Server-Sent Events: replays stored events, then streams live progress."""
     inv = load_investigation(c, investigation_id, with_result=False)
@@ -184,13 +203,15 @@ async def investigation_events(
             yield f"id: {event.seq}\nevent: progress\ndata: {json.dumps(payload)}\n\n"
         yield "event: end\ndata: {}\n\n"
 
-    return StreamingResponse(stream(), media_type="text/event-stream",
-                             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
+    return StreamingResponse(
+        stream(), media_type="text/event-stream", headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"}
+    )
 
 
 @router.get("/{investigation_id}/evidence")
-async def investigation_evidence(investigation_id: str, type: str | None = None,
-                                 c: Container = Depends(get_container)) -> dict[str, Any]:
+async def investigation_evidence(
+    investigation_id: str, type: str | None = None, c: Container = Depends(get_container)
+) -> dict[str, Any]:
     inv = load_investigation(c, investigation_id)
     rows = []
     for cand in inv.result.candidates if inv.result else []:
@@ -203,7 +224,9 @@ async def investigation_evidence(investigation_id: str, type: str | None = None,
 
 # --- organisation -----------------------------------------------------------------
 @router.post("/{investigation_id}/notes", status_code=201)
-async def add_note(investigation_id: str, body: dict = Body(...), c: Container = Depends(get_container)) -> dict[str, Any]:
+async def add_note(
+    investigation_id: str, body: dict = Body(...), c: Container = Depends(get_container)
+) -> dict[str, Any]:
     load_investigation(c, investigation_id, with_result=False)
     text = str(body.get("text", "")).strip()[:5000]
     if not text:
@@ -227,7 +250,9 @@ def _clean_tag(tag: str) -> str:
 
 
 @router.post("/{investigation_id}/tags")
-async def add_tag(investigation_id: str, body: dict = Body(...), c: Container = Depends(get_container)) -> dict[str, Any]:
+async def add_tag(
+    investigation_id: str, body: dict = Body(...), c: Container = Depends(get_container)
+) -> dict[str, Any]:
     load_investigation(c, investigation_id, with_result=False)
     return {"tags": c.repo.add_tag(investigation_id, _clean_tag(str(body.get("tag", ""))))}
 

@@ -44,8 +44,11 @@ class DdgsProvider(WebSearchProvider):
             raise ProviderError(f"duckduckgo: {type(exc).__name__}") from exc
         return [
             WebSearchHit(
-                url=row["href"], title=str(row.get("title") or "")[:300], snippet=str(row.get("body") or "")[:600],
-                provider=self.name, query=query,
+                url=row["href"],
+                title=str(row.get("title") or "")[:300],
+                snippet=str(row.get("body") or "")[:600],
+                provider=self.name,
+                query=query,
             )
             for row in rows
             if isinstance(row, dict) and str(row.get("href", "")).startswith(("http://", "https://"))

@@ -37,17 +37,28 @@ def test_parse_html_extracts_profile_and_prioritises_images():
 
 
 def page(text: str, **profile) -> CandidatePage:
-    return CandidatePage(id="p", url="https://example.org/p", canonical_url="https://example.org/p", domain="example.org",
-                         profile=PageProfile(text_excerpt=text, **profile))
+    return CandidatePage(
+        id="p",
+        url="https://example.org/p",
+        canonical_url="https://example.org/p",
+        domain="example.org",
+        profile=PageProfile(text_excerpt=text, **profile),
+    )
 
 
 def test_text_evidence_matches_supplied_hints_only():
     svc = TextEvidenceService()
     assert svc.evaluate(page("Jane Doe from Vienna"), IdentityHints()) == []
-    ev = svc.evaluate(page("Jane Doe works at Example GmbH in Wien, Austria", usernames=["janedoe93"],
-                           emails=["jane@example.org"]),
-                      IdentityHints(name="Jane Doe", location="Vienna", employer="Example GmbH",
-                                    usernames=["janedoe93"], emails=["jane@example.org"]))
+    ev = svc.evaluate(
+        page("Jane Doe works at Example GmbH in Wien, Austria", usernames=["janedoe93"], emails=["jane@example.org"]),
+        IdentityHints(
+            name="Jane Doe",
+            location="Vienna",
+            employer="Example GmbH",
+            usernames=["janedoe93"],
+            emails=["jane@example.org"],
+        ),
+    )
     types = {e.type: e for e in ev}
     assert types[EvidenceType.NAME_MATCH].strength == EvidenceStrength.MODERATE
     assert types[EvidenceType.USERNAME_MATCH].strength == EvidenceStrength.STRONG
@@ -74,8 +85,9 @@ async def test_leads_disabled_by_default_and_labelled(make_container):
     from app.domain.investigation import LeadStatus
 
     c = make_container()
-    leads = await c.investigations.leads.collect(IdentityHints(name="Jane Doe", emails=["jane@example.org"]),
-                                                 [page("x", emails=["jd@example.net"])], [])
+    leads = await c.investigations.leads.collect(
+        IdentityHints(name="Jane Doe", emails=["jane@example.org"]), [page("x", emails=["jd@example.net"])], []
+    )
     kinds = {lead.classification for lead in leads}
     assert kinds == {"PROVIDED_EMAIL", "OBSERVED_EMAIL"}
     assert all(lead.status != LeadStatus.GENERATED_CANDIDATE for lead in leads)

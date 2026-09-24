@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import sqlite3
 import threading
@@ -132,10 +133,8 @@ class SQLiteInvestigationRepository(InvestigationRepository):
                 self._conn.execute("INSERT INTO schema_version (version) VALUES (?)", (SCHEMA_VERSION,))
             self._conn.commit()
         if target != ":memory:":
-            try:
+            with contextlib.suppress(OSError):  # e.g. Windows
                 Path(target).chmod(0o600)
-            except OSError:  # pragma: no cover
-                pass
 
     # ------------------------------------------------------------------ helpers
     def _exec(self, sql: str, params: tuple = ()) -> sqlite3.Cursor:
@@ -162,7 +161,9 @@ class SQLiteInvestigationRepository(InvestigationRepository):
             pinned=bool(row["pinned"]),
         )
         inv.reference_images = self.get_reference_images(inv_id)
-        inv.tags = [r["tag"] for r in self._query("SELECT tag FROM tags WHERE investigation_id=? ORDER BY tag", (inv_id,))]
+        inv.tags = [
+            r["tag"] for r in self._query("SELECT tag FROM tags WHERE investigation_id=? ORDER BY tag", (inv_id,))
+        ]
         inv.notes = [
             Note(id=r["id"], text=r["text"], created_at=_dt(r["created_at"]))
             for r in self._query("SELECT * FROM notes WHERE investigation_id=? ORDER BY id", (inv_id,))
@@ -194,7 +195,9 @@ class SQLiteInvestigationRepository(InvestigationRepository):
         rows = self._query("SELECT * FROM investigations WHERE id=?", (investigation_id,))
         return self._row_to_investigation(rows[0], with_result=with_result) if rows else None
 
-    def list_investigations(self, *, limit: int = 50, tag: str | None = None, query: str | None = None) -> list[Investigation]:
+    def list_investigations(
+        self, *, limit: int = 50, tag: str | None = None, query: str | None = None
+    ) -> list[Investigation]:
         sql = "SELECT i.* FROM investigations i"
         params: list[object] = []
         where = []
@@ -252,7 +255,8 @@ class SQLiteInvestigationRepository(InvestigationRepository):
     def candidate_summary(self, investigation_id: str) -> tuple[int, str | None, str | None]:
         rows = self._query(
             "SELECT display_name, level, (SELECT COUNT(*) FROM candidates WHERE investigation_id=?) AS n "
-            "FROM candidates WHERE investigation_id=? ORDER BY rank LIMIT 1", (investigation_id, investigation_id)
+            "FROM candidates WHERE investigation_id=? ORDER BY rank LIMIT 1",
+            (investigation_id, investigation_id),
         )
         if not rows:
             return 0, None, None
@@ -274,8 +278,15 @@ class SQLiteInvestigationRepository(InvestigationRepository):
                 conn.execute(
                     "INSERT INTO candidates (investigation_id, id, rank, display_name, level, score, data_json)"
                     " VALUES (?,?,?,?,?,?,?)",
-                    (inv_id, cand.id, cand.rank, cand.display_name, cand.assessment.level.value,
-                     cand.assessment.score, cand.model_dump_json()),
+                    (
+                        inv_id,
+                        cand.id,
+                        cand.rank,
+                        cand.display_name,
+                        cand.assessment.level.value,
+                        cand.assessment.score,
+                        cand.model_dump_json(),
+                    ),
                 )
                 for ev in cand.evidence:
                     conn.execute(
@@ -287,13 +298,25 @@ class SQLiteInvestigationRepository(InvestigationRepository):
                 conn.execute(
                     "INSERT INTO provider_runs (investigation_id, provider, stage, outcome, duration_ms, result_count,"
                     " cache_hit, error, detail, started_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                    (inv_id, run.provider, run.stage, run.outcome.value, run.duration_ms, run.result_count,
-                     int(run.cache_hit), run.error, run.detail, run.started_at.isoformat()),
+                    (
+                        inv_id,
+                        run.provider,
+                        run.stage,
+                        run.outcome.value,
+                        run.duration_ms,
+                        run.result_count,
+                        int(run.cache_hit),
+                        run.error,
+                        run.detail,
+                        run.started_at.isoformat(),
+                    ),
                 )
             conn.commit()
 
     def get_result(self, investigation_id: str) -> InvestigationResult | None:
-        rows = self._query("SELECT result_json FROM investigation_results WHERE investigation_id=?", (investigation_id,))
+        rows = self._query(
+            "SELECT result_json FROM investigation_results WHERE investigation_id=?", (investigation_id,)
+        )
         return InvestigationResult.model_validate_json(rows[0]["result_json"]) if rows else None
 
     # ------------------------------------------------------------ reference images
@@ -307,8 +330,14 @@ class SQLiteInvestigationRepository(InvestigationRepository):
         self._exec(
             "INSERT OR REPLACE INTO reference_images (id, investigation_id, created_at, meta_json, stored_path,"
             " embeddings_json) VALUES (?,?,?,?,?,?)",
-            (image.id, image.investigation_id, image.created_at.isoformat(), image.model_dump_json(),
-             image.stored_path, embeddings_json),
+            (
+                image.id,
+                image.investigation_id,
+                image.created_at.isoformat(),
+                image.model_dump_json(),
+                image.stored_path,
+                embeddings_json,
+            ),
         )
 
     def _row_to_reference(self, row: sqlite3.Row, with_embeddings: bool) -> ReferenceImage:
@@ -347,8 +376,14 @@ class SQLiteInvestigationRepository(InvestigationRepository):
             event.seq = int(row[0])
             self._conn.execute(
                 "INSERT INTO events (investigation_id, seq, type, message, data_json, at) VALUES (?,?,?,?,?,?)",
-                (event.investigation_id, event.seq, event.type.value, event.message,
-                 json.dumps(event.data, default=str), event.at.isoformat()),
+                (
+                    event.investigation_id,
+                    event.seq,
+                    event.type.value,
+                    event.message,
+                    json.dumps(event.data, default=str),
+                    event.at.isoformat(),
+                ),
             )
             self._conn.commit()
         return event
@@ -359,8 +394,12 @@ class SQLiteInvestigationRepository(InvestigationRepository):
         )
         return [
             ProgressEvent(
-                seq=r["seq"], investigation_id=investigation_id, type=r["type"], message=r["message"],
-                data=json.loads(r["data_json"]), at=_dt(r["at"]),
+                seq=r["seq"],
+                investigation_id=investigation_id,
+                type=r["type"],
+                message=r["message"],
+                data=json.loads(r["data_json"]),
+                at=_dt(r["at"]),
             )
             for r in rows
         ]
@@ -377,12 +416,15 @@ class SQLiteInvestigationRepository(InvestigationRepository):
         return Note(id=int(cur.lastrowid or 0), text=text, created_at=_dt(created))
 
     def delete_note(self, investigation_id: str, note_id: int) -> bool:
-        return self._exec(
-            "DELETE FROM notes WHERE id=? AND investigation_id=?", (note_id, investigation_id)
-        ).rowcount > 0
+        return (
+            self._exec("DELETE FROM notes WHERE id=? AND investigation_id=?", (note_id, investigation_id)).rowcount > 0
+        )
 
     def _tags(self, investigation_id: str) -> list[str]:
-        return [r["tag"] for r in self._query("SELECT tag FROM tags WHERE investigation_id=? ORDER BY tag", (investigation_id,))]
+        return [
+            r["tag"]
+            for r in self._query("SELECT tag FROM tags WHERE investigation_id=? ORDER BY tag", (investigation_id,))
+        ]
 
     def add_tag(self, investigation_id: str, tag: str) -> list[str]:
         self._exec("INSERT OR IGNORE INTO tags (investigation_id, tag) VALUES (?,?)", (investigation_id, tag))
@@ -393,7 +435,9 @@ class SQLiteInvestigationRepository(InvestigationRepository):
         return self._tags(investigation_id)
 
     def all_tags(self) -> dict[str, int]:
-        return {r["tag"]: r["n"] for r in self._query("SELECT tag, COUNT(*) AS n FROM tags GROUP BY tag ORDER BY n DESC")}
+        return {
+            r["tag"]: r["n"] for r in self._query("SELECT tag, COUNT(*) AS n FROM tags GROUP BY tag ORDER BY n DESC")
+        }
 
     # ------------------------------------------------------------------ retention
     def reference_images_created_before(self, cutoff: datetime) -> list[ReferenceImage]:
@@ -410,7 +454,8 @@ class SQLiteInvestigationRepository(InvestigationRepository):
             for face in meta.faces:
                 face.thumbnail = None  # derived from the reference photo
             self._exec(
-                "UPDATE reference_images SET stored_path=NULL, meta_json=? WHERE id=?", (meta.model_dump_json(), image_id)
+                "UPDATE reference_images SET stored_path=NULL, meta_json=? WHERE id=?",
+                (meta.model_dump_json(), image_id),
             )
         if embeddings:
             self._exec("UPDATE reference_images SET embeddings_json=NULL WHERE id=?", (image_id,))
@@ -429,7 +474,7 @@ class SQLiteInvestigationRepository(InvestigationRepository):
 
 def create_repository(database_url: str) -> InvestigationRepository:
     if database_url.startswith("sqlite:///"):
-        return SQLiteInvestigationRepository(database_url[len("sqlite:///"):] or ":memory:")
+        return SQLiteInvestigationRepository(database_url[len("sqlite:///") :] or ":memory:")
     if database_url in ("sqlite://", "sqlite:///:memory:", ":memory:"):
         return SQLiteInvestigationRepository(":memory:")
     raise ValueError(

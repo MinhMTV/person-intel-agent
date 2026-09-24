@@ -25,7 +25,9 @@ class InvestigationRepository(ABC):
     def get(self, investigation_id: str, *, with_result: bool = True) -> Investigation | None: ...
 
     @abstractmethod
-    def list_investigations(self, *, limit: int = 50, tag: str | None = None, query: str | None = None) -> list[Investigation]: ...
+    def list_investigations(
+        self, *, limit: int = 50, tag: str | None = None, query: str | None = None
+    ) -> list[Investigation]: ...
 
     @abstractmethod
     def update_meta(self, investigation: Investigation) -> None:

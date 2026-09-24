@@ -78,7 +78,11 @@ class GitHubProfileProvider(ProfileProvider):
             check_response(resp, self.name)
             data = json_or_raise(resp, self.name)
             items = data.get("items", []) if isinstance(data, dict) else []
-            logins += [(i["login"], f"name:{hints.name}") for i in items[: self.max_name_results] if isinstance(i, dict) and i.get("login")]
+            logins += [
+                (i["login"], f"name:{hints.name}")
+                for i in items[: self.max_name_results]
+                if isinstance(i, dict) and i.get("login")
+            ]
         seen: set[str] = set()
         unique: list[tuple[str, str]] = []
         for login, lookup in logins:

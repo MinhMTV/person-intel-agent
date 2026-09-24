@@ -13,21 +13,29 @@ from app.services.candidate_discovery_service import QueryPlanner
 from tests.conftest import make_settings
 
 VISION_RESPONSE = {
-    "responses": [{
-        "webDetection": {
-            "webEntities": [{"entityId": "/m/1", "score": 0.9, "description": "Jane Doe"}],
-            "fullMatchingImages": [{"url": "https://cdn.example.com/full.jpg"}],
-            "partialMatchingImages": [{"url": "https://cdn.example.com/partial.jpg"}],
-            "pagesWithMatchingImages": [
-                {"url": "https://example.org/team", "pageTitle": "<b>Jane</b> Doe - Team",
-                 "fullMatchingImages": [{"url": "https://example.org/jane.jpg"}]},
-                {"url": "https://news.example.com/a", "partialMatchingImages": [{"url": "https://news.example.com/c.jpg"}]},
-                {"url": "https://unknown.example.com/x"},
-            ],
-            "visuallySimilarImages": [{"url": "https://sim.example.com/1.jpg"}],
-            "bestGuessLabels": [{"label": "jane doe", "languageCode": "en"}],
+    "responses": [
+        {
+            "webDetection": {
+                "webEntities": [{"entityId": "/m/1", "score": 0.9, "description": "Jane Doe"}],
+                "fullMatchingImages": [{"url": "https://cdn.example.com/full.jpg"}],
+                "partialMatchingImages": [{"url": "https://cdn.example.com/partial.jpg"}],
+                "pagesWithMatchingImages": [
+                    {
+                        "url": "https://example.org/team",
+                        "pageTitle": "<b>Jane</b> Doe - Team",
+                        "fullMatchingImages": [{"url": "https://example.org/jane.jpg"}],
+                    },
+                    {
+                        "url": "https://news.example.com/a",
+                        "partialMatchingImages": [{"url": "https://news.example.com/c.jpg"}],
+                    },
+                    {"url": "https://unknown.example.com/x"},
+                ],
+                "visuallySimilarImages": [{"url": "https://sim.example.com/1.jpg"}],
+                "bestGuessLabels": [{"label": "jane doe", "languageCode": "en"}],
+            }
         }
-    }]
+    ]
 }
 
 
@@ -65,21 +73,53 @@ async def test_google_vision_not_configured_and_http(tmp_path):
     from app.domain.image import ImageQuality, QualityLabel, ReferenceImage
     from app.providers.reverse_image.base import ReverseImageQuery
 
-    ref = ReferenceImage(id="r", investigation_id="i", mime="image/jpeg", size_bytes=1, width=1, height=1, sha256="x",
-                         phash="0" * 16, quality=ImageQuality(label=QualityLabel.GOOD, width=1, height=1, face_count=0))
-    _, run = await run_provider("google_vision", "reverse_image", lambda: provider.search(ReverseImageQuery(ref, b"x")), timeout=5)
+    ref = ReferenceImage(
+        id="r",
+        investigation_id="i",
+        mime="image/jpeg",
+        size_bytes=1,
+        width=1,
+        height=1,
+        sha256="x",
+        phash="0" * 16,
+        quality=ImageQuality(label=QualityLabel.GOOD, width=1, height=1, face_count=0),
+    )
+    _, run = await run_provider(
+        "google_vision", "reverse_image", lambda: provider.search(ReverseImageQuery(ref, b"x")), timeout=5
+    )
     assert run.outcome == ProviderOutcome.RATE_LIMITED
 
 
 def test_tineye_parsing(tmp_path):
-    payload = {"status": "ok", "results": {"matches": [
-        {"image_url": "https://img.example.com/1.jpg", "score": 99, "query_match_percent": 99, "target_overlap_percent": 98,
-         "backlinks": [{"url": "https://img.example.com/1.jpg", "backlink": "https://site.example.com/post"}]},
-        {"image_url": "https://img.example.com/2.jpg", "query_match_percent": 40, "target_overlap_percent": 95, "backlinks": []},
-        {"image_url": "https://img.example.com/3.jpg", "query_match_percent": 85, "target_overlap_percent": 85},
-    ]}}
+    payload = {
+        "status": "ok",
+        "results": {
+            "matches": [
+                {
+                    "image_url": "https://img.example.com/1.jpg",
+                    "score": 99,
+                    "query_match_percent": 99,
+                    "target_overlap_percent": 98,
+                    "backlinks": [
+                        {"url": "https://img.example.com/1.jpg", "backlink": "https://site.example.com/post"}
+                    ],
+                },
+                {
+                    "image_url": "https://img.example.com/2.jpg",
+                    "query_match_percent": 40,
+                    "target_overlap_percent": 95,
+                    "backlinks": [],
+                },
+                {"image_url": "https://img.example.com/3.jpg", "query_match_percent": 85, "target_overlap_percent": 85},
+            ]
+        },
+    }
     out = parse_tineye_response(payload, "r")
-    assert [r.match_type for r in out.results] == [ImageMatchType.EXACT, ImageMatchType.PARTIAL, ImageMatchType.MODIFIED]
+    assert [r.match_type for r in out.results] == [
+        ImageMatchType.EXACT,
+        ImageMatchType.PARTIAL,
+        ImageMatchType.MODIFIED,
+    ]
     assert out.results[0].page_url == "https://site.example.com/post"
     assert all(r.provider == "tineye" for r in out.results)
     with pytest.raises(ProviderError):
@@ -120,12 +160,22 @@ async def test_run_provider_outcomes():
 
 def test_query_planner_is_bounded_and_deduplicated():
     planner = QueryPlanner(max_queries=12)
-    plan = planner.plan(IdentityHints(name="Jane Doe", location="Vienna", employer="Example GmbH", university="TU Wien",
-                                      usernames=["janedoe93", "JaneDoe93"], emails=["jane@example.com"]))
+    plan = planner.plan(
+        IdentityHints(
+            name="Jane Doe",
+            location="Vienna",
+            employer="Example GmbH",
+            university="TU Wien",
+            usernames=["janedoe93", "JaneDoe93"],
+            emails=["jane@example.com"],
+        )
+    )
     queries = [p.query for p in plan]
     assert len(queries) <= 12 and len(queries) == len({q.lower() for q in queries})
     assert '"Jane Doe" Vienna' in queries and '"janedoe93"' in queries
     assert any("site:xing.com" in q for q in queries)  # Vienna → Austria → DACH
     assert planner.plan(IdentityHints()) == []
-    hinted = planner.plan(IdentityHints(), [WebEntity(description="Jane Doe", score=0.8), WebEntity(description="Logo")])
+    hinted = planner.plan(
+        IdentityHints(), [WebEntity(description="Jane Doe", score=0.8), WebEntity(description="Logo")]
+    )
     assert [p.purpose for p in hinted] == ["web_entity"]

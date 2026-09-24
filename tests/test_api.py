@@ -21,21 +21,38 @@ REFERENCE = make_image([(JANE, (100, 80, 110))], seed=1)
 
 
 def setup_world(world):
-    world.page("https://example.org/team/jane", """<html><head><title>Jane Doe <script>alert(1)</script></title>
-        <meta property="og:image" content="https://cdn.example.org/jane.png"></head><body><h1>Jane Doe</h1>Vienna</body></html>""")
+    world.page(
+        "https://example.org/team/jane",
+        """<html><head><title>Jane Doe <script>alert(1)</script></title>
+        <meta property="og:image" content="https://cdn.example.org/jane.png"></head><body><h1>Jane Doe</h1>Vienna</body></html>""",
+    )
     world.image("https://cdn.example.org/jane.png", REFERENCE)
-    world.page("https://social.example/janedoe93", """<html><head><title>Jane Doe</title>
-        <meta property="og:image" content="https://social.example/a.png"></head><body>Jane Doe, Vienna</body></html>""")
+    world.page(
+        "https://social.example/janedoe93",
+        """<html><head><title>Jane Doe</title>
+        <meta property="og:image" content="https://social.example/a.png"></head><body>Jane Doe, Vienna</body></html>""",
+    )
     world.image("https://social.example/a.png", make_image([(JANE_OTHER, (60, 60, 120))], seed=2))
 
 
 def providers():
-    return dict(
-        reverse_providers=[FakeReverseProvider([ImageDiscoveryResult(
-            provider="fake_reverse", match_type=ImageMatchType.EXACT, image_url="https://cdn.example.org/jane.png",
-            page_url="https://example.org/team/jane")])],
-        search_providers=[FakeSearchProvider({'"Jane Doe"': [("https://social.example/janedoe93", "Jane Doe", "Vienna")]})],
-    )
+    return {
+        "reverse_providers": [
+            FakeReverseProvider(
+                [
+                    ImageDiscoveryResult(
+                        provider="fake_reverse",
+                        match_type=ImageMatchType.EXACT,
+                        image_url="https://cdn.example.org/jane.png",
+                        page_url="https://example.org/team/jane",
+                    )
+                ]
+            )
+        ],
+        "search_providers": [
+            FakeSearchProvider({'"Jane Doe"': [("https://social.example/janedoe93", "Jane Doe", "Vienna")]})
+        ],
+    }
 
 
 @pytest.fixture
@@ -83,7 +100,7 @@ def test_full_flow_create_run_events_results_exports(client):
     # SSE replays persisted events after completion
     with client.stream("GET", f"/api/investigations/{inv['id']}/events") as stream:
         body = "".join(stream.iter_text())
-    events = [json.loads(line[6:])["type"] for line in body.splitlines() if line.startswith("data: {\"seq")]
+    events = [json.loads(line[6:])["type"] for line in body.splitlines() if line.startswith('data: {"seq')]
     assert events[0] == "INVESTIGATION_STARTED" and events[-1] == "INVESTIGATION_COMPLETED"
     assert "REVERSE_IMAGE_RESULT_FOUND" in events and "FACE_MATCH_FOUND" in events
 
@@ -95,8 +112,14 @@ def test_full_flow_create_run_events_results_exports(client):
 
     client.post(f"/api/investigations/{inv['id']}/notes", json={"text": "=cmd|' /C calc'!A0"})
     client.post(f"/api/investigations/{inv['id']}/tags", json={"tag": "Verified"})
-    for fmt, marker in [("json", b'"candidates"'), ("md", b"## Candidates"), ("html", b"<h2>Candidates</h2>"),
-                        ("csv", b"evidence_type"), ("pdf", b"%PDF"), ("zip", b"PK")]:
+    for fmt, marker in [
+        ("json", b'"candidates"'),
+        ("md", b"## Candidates"),
+        ("html", b"<h2>Candidates</h2>"),
+        ("csv", b"evidence_type"),
+        ("pdf", b"%PDF"),
+        ("zip", b"PK"),
+    ]:
         r = client.get(f"/api/investigations/{inv['id']}/export?format={fmt}")
         assert r.status_code == 200, fmt
         assert marker in r.content, fmt
@@ -105,7 +128,9 @@ def test_full_flow_create_run_events_results_exports(client):
     assert "<script>alert(1)</script>" not in html  # remote page text is escaped
     csv_text = client.get(f"/api/investigations/{inv['id']}/export?format=csv").text
     assert "'=cmd" in csv_text  # formula injection neutralised
-    assert "verified" in client.get(f"/api/investigations/{inv['id']}/export?format=json").json()["investigation"]["tags"]
+    assert (
+        "verified" in client.get(f"/api/investigations/{inv['id']}/export?format=json").json()["investigation"]["tags"]
+    )
 
     listing = client.get("/api/investigations").json()["investigations"]
     assert listing[0]["id"] == inv["id"] and listing[0]["candidate_count"] >= 1
@@ -127,8 +152,12 @@ def test_face_selection_and_running_lock(client):
     target = next(f for f in ref["faces"] if f["bbox"]["x"] == 170)
     r = client.put(f"/api/investigations/{inv['id']}/reference-images/{ref['id']}/face", json={"face_id": target["id"]})
     assert r.json()["reference_image"]["selected_face_id"] == target["id"]
-    assert client.put(f"/api/investigations/{inv['id']}/reference-images/{ref['id']}/face",
-                      json={"face_id": "nope"}).status_code == 400
+    assert (
+        client.put(
+            f"/api/investigations/{inv['id']}/reference-images/{ref['id']}/face", json={"face_id": "nope"}
+        ).status_code
+        == 400
+    )
 
 
 def test_security_headers_and_session_endpoints_disabled(client):
@@ -185,12 +214,28 @@ def test_rest_cli_and_service_produce_equivalent_results(make_container, world, 
     monkeypatch.setattr("app.container.build_container", lambda *a, **k: make_container(settings, **providers()))
     ref_path = tmp_path / "ref.png"
     ref_path.write_bytes(REFERENCE)
-    out = CliRunner().invoke(cli_module.cli, ["investigate", "-i", str(ref_path), "--name", "Jane Doe", "--location",
-                                               "Vienna", "--export", "json", "-o", str(tmp_path / "out")])
+    out = CliRunner().invoke(
+        cli_module.cli,
+        [
+            "investigate",
+            "-i",
+            str(ref_path),
+            "--name",
+            "Jane Doe",
+            "--location",
+            "Vienna",
+            "--export",
+            "json",
+            "-o",
+            str(tmp_path / "out"),
+        ],
+    )
     assert out.exit_code == 0, out.output
     cli_json = json.loads(next((tmp_path / "out").glob("*.json")).read_text())
-    cli_summary = sorted((c["display_name"], c["assessment"]["level"], tuple(sorted(c["urls"])))
-                         for c in cli_json["result"]["candidates"])
+    cli_summary = sorted(
+        (c["display_name"], c["assessment"]["level"], tuple(sorted(c["urls"])))
+        for c in cli_json["result"]["candidates"]
+    )
 
     assert summary(direct_result) == summary(rest_result) == cli_summary
     assert direct_result.fingerprint == rest_result.fingerprint == cli_json["result"]["fingerprint"]

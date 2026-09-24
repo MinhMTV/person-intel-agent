@@ -13,22 +13,22 @@ from tests.fakes import FakeFaceBackend, WebWorld, public_resolver
 
 
 def make_settings(tmp_path: Path, **overrides) -> Settings:
-    base = dict(
-        app_env="test",
-        data_dir=tmp_path / "data",
-        database_url=f"sqlite:///{tmp_path / 'data' / 'test.db'}",
-        google_vision_enabled=False,
-        tineye_enabled=False,
-        searxng_enabled=False,
-        ddgs_enabled=False,
-        github_enabled=False,
-        wikidata_enabled=False,
-        use_web_entity_hints=True,
-        outbound_use_env_proxy=False,
-        rate_limit_per_minute=0,
-        investigation_timeout=60,
-        http_timeout_seconds=5,
-    )
+    base = {
+        "app_env": "test",
+        "data_dir": tmp_path / "data",
+        "database_url": f"sqlite:///{tmp_path / 'data' / 'test.db'}",
+        "google_vision_enabled": False,
+        "tineye_enabled": False,
+        "searxng_enabled": False,
+        "ddgs_enabled": False,
+        "github_enabled": False,
+        "wikidata_enabled": False,
+        "use_web_entity_hints": True,
+        "outbound_use_env_proxy": False,
+        "rate_limit_per_minute": 0,
+        "investigation_timeout": 60,
+        "http_timeout_seconds": 5,
+    }
     base.update(overrides)
     return Settings(_env_file=None, **base)  # type: ignore[call-arg]
 

@@ -34,10 +34,6 @@ class ProviderRateLimited(ProviderError):
     outcome = ProviderOutcome.RATE_LIMITED
 
 
-class ProviderTimeout(ProviderError):
-    outcome = ProviderOutcome.TIMEOUT
-
-
 class MalformedResponse(ProviderError):
     outcome = ProviderOutcome.FAILED
 
@@ -73,7 +69,9 @@ async def run_provider(
     cache_hit: bool = False,
 ) -> tuple[T | None, ProviderRun]:
     started = time.perf_counter()
-    run = ProviderRun(provider=provider, stage=stage, outcome=ProviderOutcome.SUCCESS, detail=detail, cache_hit=cache_hit)
+    run = ProviderRun(
+        provider=provider, stage=stage, outcome=ProviderOutcome.SUCCESS, detail=detail, cache_hit=cache_hit
+    )
     result: T | None = None
     try:
         result = await asyncio.wait_for(call(), timeout=timeout)

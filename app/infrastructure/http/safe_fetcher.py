@@ -113,7 +113,9 @@ class SafeFetcher:
 
     def _get_client(self) -> httpx.AsyncClient:
         if self._client is None:
-            timeout = httpx.Timeout(self.settings.http_timeout_seconds, connect=min(6.0, self.settings.http_timeout_seconds))
+            timeout = httpx.Timeout(
+                self.settings.http_timeout_seconds, connect=min(6.0, self.settings.http_timeout_seconds)
+            )
             limits = httpx.Limits(max_connections=32, max_keepalive_connections=16)
             headers = {
                 "User-Agent": self.settings.http_user_agent,
@@ -128,7 +130,7 @@ class SafeFetcher:
             else:
                 transport = httpx.AsyncHTTPTransport(limits=limits, trust_env=False)
                 # Replace the pool with one whose network backend pins validated IPs.
-                transport._pool = httpcore.AsyncConnectionPool(  # noqa: SLF001
+                transport._pool = httpcore.AsyncConnectionPool(
                     ssl_context=httpx.create_ssl_context(),
                     max_connections=limits.max_connections,
                     max_keepalive_connections=limits.max_keepalive_connections,
@@ -166,7 +168,11 @@ class SafeFetcher:
         accept_types = PAGE_TYPES if kind == "page" else IMAGE_TYPES
         if max_bytes is None:
             max_bytes = self.settings.max_remote_page_bytes if kind == "page" else self.settings.max_remote_image_bytes
-        accept_header = "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5" if kind == "page" else "image/avif,image/webp,image/*;q=0.9"
+        accept_header = (
+            "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5"
+            if kind == "page"
+            else "image/avif,image/webp,image/*;q=0.9"
+        )
         client = self._get_client()
         current = url
         for _hop in range(self.settings.http_max_redirects + 1):

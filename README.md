@@ -208,7 +208,7 @@ version.
 
 ```bash
 pip install -r requirements.txt
-python -m pytest            # 117 tests, offline (mocked providers, synthetic imagery, fake face backend)
+python -m pytest            # 111 tests, offline (mocked providers, synthetic imagery, fake face backend)
 ruff check app tests && mypy app
 ```
 

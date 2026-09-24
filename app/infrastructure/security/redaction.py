@@ -7,8 +7,13 @@ import re
 
 _PATTERNS = [
     (re.compile(r"(?i)bearer\s+[a-z0-9._\-]+"), "Bearer-[REDACTED]"),
-    (re.compile(r"(?i)(authorization|x-api-token|x-api-key|api[_-]?key|token|secret|password|cookie|sessionid|li_at)"
-                r"(\s*[=:]\s*|\"\s*:\s*\")([^\s\"',;&]+)"), r"\1\2[REDACTED]"),
+    (
+        re.compile(
+            r"(?i)(authorization|x-api-token|x-api-key|api[_-]?key|token|secret|password|cookie|sessionid|li_at)"
+            r"(\s*[=:]\s*|\"\s*:\s*\")([^\s\"',;&]+)"
+        ),
+        r"\1\2[REDACTED]",
+    ),
     (re.compile(r"(?i)([?&](?:key|api_key|token|access_token)=)[^&\s]+"), r"\1[REDACTED]"),
 ]
 

@@ -57,6 +57,7 @@ async def login(response: Response, body: dict = Body(...), c: Container = Depen
         return {"ok": True}
     if not token_valid(c.settings, token):
         raise HTTPException(status_code=401, detail="Invalid token")
-    response.set_cookie(TOKEN_COOKIE, token, httponly=True, samesite="strict", secure=c.settings.is_production,
-                        max_age=12 * 3600)
+    response.set_cookie(
+        TOKEN_COOKIE, token, httponly=True, samesite="strict", secure=c.settings.is_production, max_age=12 * 3600
+    )
     return {"ok": True}

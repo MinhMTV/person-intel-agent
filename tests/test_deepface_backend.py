@@ -25,8 +25,11 @@ def test_enforces_detection_and_filters_placeholder_faces(monkeypatch):
     def represent(**kwargs):
         calls.update(kwargs)
         return [
-            {"embedding": [1.0, 0.0], "facial_area": {"x": 5, "y": 6, "w": 40, "h": 50, "left_eye": (30, 20),
-                                                      "right_eye": (15, 21)}, "face_confidence": 0.93},
+            {
+                "embedding": [1.0, 0.0],
+                "facial_area": {"x": 5, "y": 6, "w": 40, "h": 50, "left_eye": (30, 20), "right_eye": (15, 21)},
+                "face_confidence": 0.93,
+            },
             {"embedding": [0.0, 1.0], "facial_area": {"x": 0, "y": 0, "w": 99, "h": 99}, "face_confidence": 0.0},
         ]
 

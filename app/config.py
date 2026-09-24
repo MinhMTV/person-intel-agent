@@ -7,6 +7,7 @@ All configuration comes from environment variables (optionally loaded from a
 
 from __future__ import annotations
 
+import contextlib
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
@@ -83,7 +84,6 @@ class Settings(BaseSettings):
     face_high_threshold: float = 0.55
     face_match_threshold: float = 0.68
     face_low_threshold: float = 0.80
-    enable_demographics: bool = False  # age/gender/emotion — never used for matching
     phash_duplicate_distance: int = 6  # Hamming distance (64-bit pHash)
 
     # --- Providers --------------------------------------------------------------
@@ -125,7 +125,6 @@ class Settings(BaseSettings):
     cache_ttl_web_search: int = 6 * 3600
     cache_ttl_reverse_image: int = 24 * 3600
     cache_ttl_page: int = 6 * 3600
-    cache_ttl_image_meta: int = 24 * 3600
     cache_ttl_face_embedding: int = 24 * 3600
 
     @field_validator("cors_origins", mode="before")
@@ -150,6 +149,17 @@ class Settings(BaseSettings):
     @property
     def session_dir(self) -> Path:
         return self.data_dir / "sessions"
+
+    def upload_path(self, stored_path: str | None) -> Path | None:
+        """Return ``stored_path`` only if it lies inside the upload directory."""
+        if not stored_path:
+            return None
+        path = Path(stored_path)
+        try:
+            path.resolve().relative_to(self.upload_dir.resolve())
+        except ValueError:
+            return None
+        return path
 
     @property
     def max_upload_bytes(self) -> int:
@@ -189,7 +199,5 @@ def ensure_data_dirs(settings: Settings) -> None:
     """Create private data directories (0700)."""
     for path in (settings.data_dir, settings.upload_dir, settings.session_dir):
         path.mkdir(parents=True, exist_ok=True)
-        try:
+        with contextlib.suppress(OSError):  # e.g. Windows
             path.chmod(0o700)
-        except OSError:  # pragma: no cover - e.g. Windows
-            pass

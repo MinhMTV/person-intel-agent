@@ -2,9 +2,7 @@
 
 from app.analysis.location import (
     ALL_LOCATIONS,
-    build_location_queries,
     expand_location,
-    get_location_hierarchy,
 )
 
 
@@ -67,42 +65,6 @@ class TestExpandLocation:
     def test_no_duplicate_terms(self):
         result = expand_location("Berlin")
         assert len(result.search_terms) == len(set(result.search_terms))
-
-
-class TestBuildLocationQueries:
-    def test_basic(self):
-        queries = build_location_queries("John Smith", ["Oberhausen"])
-        assert "John Smith Oberhausen" in queries
-        assert "John Smith NRW" in queries
-        assert "John Smith Germany" in queries
-
-    def test_multiple_locations(self):
-        queries = build_location_queries("John Smith", ["Oberhausen", "Berlin"])
-        assert "John Smith Oberhausen" in queries
-        assert "John Smith Berlin" in queries
-        assert "John Smith Germany" in queries  # Both are German
-
-    def test_unknown_location(self):
-        queries = build_location_queries("Test", ["Unknown Place"])
-        assert queries == ["Test Unknown Place"]
-
-
-class TestGetLocationHierarchy:
-    def test_german(self):
-        hierarchy = get_location_hierarchy("Oberhausen")
-        assert "Oberhausen" in hierarchy
-        assert "NRW" in hierarchy
-        assert "Germany" in hierarchy
-
-    def test_us(self):
-        hierarchy = get_location_hierarchy("Manhattan")
-        assert "Manhattan" in hierarchy
-        assert "New York" in hierarchy
-        assert "USA" in hierarchy
-
-    def test_unknown(self):
-        hierarchy = get_location_hierarchy("Nowhere")
-        assert hierarchy == ["Nowhere"]
 
 
 class TestLocationCoverage:

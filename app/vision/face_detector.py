@@ -64,7 +64,3 @@ class HaarFaceDetector:
         min_side = max(24, int(min(gray.shape[:2]) * 0.04))
         faces = self._cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(min_side, min_side))
         return [FaceObservation(int(x), int(y), int(w), int(h), None) for (x, y, w, h) in faces]
-
-
-def largest_first(faces: list[FaceObservation]) -> list[FaceObservation]:
-    return sorted(faces, key=lambda f: f.w * f.h, reverse=True)

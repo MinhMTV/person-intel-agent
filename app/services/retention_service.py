@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 
 from app.config import Settings
 from app.infrastructure.cache.store import CacheStore
@@ -38,13 +37,10 @@ class RetentionService:
         for ref in self.repo.reference_images_created_before(max(file_cutoff, emb_cutoff)):
             purge_file = ref.created_at < file_cutoff and bool(ref.stored_path)
             purge_emb = ref.created_at < emb_cutoff
-            if purge_file and ref.stored_path:
-                path = Path(ref.stored_path)
-                try:
-                    path.resolve().relative_to(s.upload_dir.resolve())
+            if purge_file:
+                path = s.upload_path(ref.stored_path)
+                if path:
                     path.unlink(missing_ok=True)
-                except ValueError:
-                    pass
                 stats["reference_files"] += 1
             if purge_emb:
                 stats["embeddings"] += 1

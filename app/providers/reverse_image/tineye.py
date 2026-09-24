@@ -59,8 +59,11 @@ def parse_tineye_response(payload: Any, reference_image_id: str | None, limit: i
         if not backlinks:
             out.results.append(
                 ImageDiscoveryResult(
-                    provider="tineye", match_type=match_type, image_url=match.get("image_url"),
-                    page_url=None, provider_score=score if isinstance(score, (int, float)) else None,
+                    provider="tineye",
+                    match_type=match_type,
+                    image_url=match.get("image_url"),
+                    page_url=None,
+                    provider_score=score if isinstance(score, (int, float)) else None,
                     reference_image_id=reference_image_id,
                 )
             )

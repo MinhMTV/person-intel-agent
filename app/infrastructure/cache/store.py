@@ -19,7 +19,7 @@ from typing import Any
 from app.config import PIPELINE_VERSION
 from app.utils.canonical import stable_hash
 
-NAMESPACES = ("web_search", "reverse_image", "page", "image_meta", "face_embedding", "profile")
+NAMESPACES = ("web_search", "reverse_image", "page", "face_embedding", "profile")
 
 
 def cache_key(namespace: str, **inputs: Any) -> str:
@@ -31,7 +31,8 @@ class CacheStore:
         self._lock = threading.Lock()
         target = ":memory:" if path is None else str(path)
         self._conn = sqlite3.connect(target, check_same_thread=False)
-        self._conn.execute("PRAGMA journal_mode=WAL") if path is not None else None
+        if path is not None:
+            self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute(
             "CREATE TABLE IF NOT EXISTS cache (namespace TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL,"
             " expires_at REAL NOT NULL, PRIMARY KEY (namespace, key))"

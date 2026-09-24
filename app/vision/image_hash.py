@@ -38,4 +38,4 @@ def hamming_distance(hash_a: str | None, hash_b: str | None) -> int:
     """Bit distance between two hex hashes (64 when either is missing)."""
     if not hash_a or not hash_b or len(hash_a) != len(hash_b):
         return 64
-    return bin(int(hash_a, 16) ^ int(hash_b, 16)).count("1")
+    return (int(hash_a, 16) ^ int(hash_b, 16)).bit_count()

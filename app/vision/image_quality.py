@@ -19,9 +19,7 @@ def laplacian_variance(gray: np.ndarray) -> float:
     if gray.shape[0] < 3 or gray.shape[1] < 3:
         return 0.0
     g = gray.astype(np.float64)
-    lap = (
-        -4 * g[1:-1, 1:-1] + g[:-2, 1:-1] + g[2:, 1:-1] + g[1:-1, :-2] + g[1:-1, 2:]
-    )
+    lap = -4 * g[1:-1, 1:-1] + g[:-2, 1:-1] + g[2:, 1:-1] + g[1:-1, :-2] + g[1:-1, 2:]
     return float(lap.var())
 
 
@@ -57,7 +55,10 @@ def assess_quality(rgb: np.ndarray, faces: list[FaceObservation], target: FaceOb
     issues: list[str] = []
     if not faces:
         return ImageQuality(
-            label=QualityLabel.POOR, width=w, height=h, face_count=0,
+            label=QualityLabel.POOR,
+            width=w,
+            height=h,
+            face_count=0,
             issues=["No face detected — face matching will not be possible; reverse image search still runs."],
         )
     target = target or max(faces, key=lambda f: f.w * f.h)

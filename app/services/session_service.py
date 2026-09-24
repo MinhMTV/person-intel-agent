@@ -17,8 +17,9 @@ def ensure_playwright_chromium() -> tuple[bool, str | None]:
         import playwright  # noqa: F401
     except ImportError:
         return False, "Playwright is not installed (pip install playwright)."
-    result = subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"],
-                            capture_output=True, text=True, check=False)
+    result = subprocess.run(
+        [sys.executable, "-m", "playwright", "install", "chromium"], capture_output=True, text=True, check=False
+    )
     if result.returncode != 0:
         return False, "Could not install Playwright Chromium."
     return True, None

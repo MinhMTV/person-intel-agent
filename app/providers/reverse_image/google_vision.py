@@ -49,7 +49,9 @@ def parse_web_detection(payload: Any, reference_image_id: str | None, max_result
     out = ReverseImageResponse()
     seen: set[tuple[str | None, str | None, str]] = set()
 
-    def add(match_type: ImageMatchType, image_url: str | None, page_url: str | None, title: str | None, score: Any) -> None:
+    def add(
+        match_type: ImageMatchType, image_url: str | None, page_url: str | None, title: str | None, score: Any
+    ) -> None:
         if not image_url and not page_url:
             return
         key = (image_url, page_url, match_type.value)
@@ -92,10 +94,14 @@ def parse_web_detection(payload: Any, reference_image_id: str | None, max_result
     for ent in web.get("webEntities") or []:
         if isinstance(ent, dict) and ent.get("description"):
             out.web_entities.append(
-                WebEntity(description=str(ent["description"])[:120], score=ent.get("score"), entity_id=ent.get("entityId"))
+                WebEntity(
+                    description=str(ent["description"])[:120], score=ent.get("score"), entity_id=ent.get("entityId")
+                )
             )
     out.best_guess_labels = [
-        str(lbl["label"])[:120] for lbl in web.get("bestGuessLabels") or [] if isinstance(lbl, dict) and lbl.get("label")
+        str(lbl["label"])[:120]
+        for lbl in web.get("bestGuessLabels") or []
+        if isinstance(lbl, dict) and lbl.get("label")
     ]
     return out
 
@@ -139,7 +145,9 @@ class GoogleCloudVisionWebDetectionProvider(ReverseImageProvider):
             from google.auth.transport.requests import Request
             from google.oauth2 import service_account
         except ImportError as exc:
-            raise ProviderNotConfigured("google_vision: install 'google-auth' to use service-account credentials") from exc
+            raise ProviderNotConfigured(
+                "google_vision: install 'google-auth' to use service-account credentials"
+            ) from exc
 
         def refresh() -> tuple[str, float]:
             if self._credentials is None:
@@ -168,4 +176,6 @@ class GoogleCloudVisionWebDetectionProvider(ReverseImageProvider):
         }
         resp = await self.client.post(ENDPOINT, json=body, headers=headers, params=params)
         check_response(resp, self.name)
-        return parse_web_detection(json_or_raise(resp, self.name), query.reference.id, self.settings.google_vision_max_results)
+        return parse_web_detection(
+            json_or_raise(resp, self.name), query.reference.id, self.settings.google_vision_max_results
+        )

@@ -30,10 +30,7 @@ def _clean_text(value: object) -> str | None:
 def _split_list(value: object) -> list[str]:
     if value is None:
         return []
-    if isinstance(value, str):
-        items = re.split(r"[,\n;]", value)
-    else:
-        items = [str(v) for v in value]  # type: ignore[attr-defined]
+    items = re.split(r"[,\n;]", value) if isinstance(value, str) else [str(v) for v in value]  # type: ignore[attr-defined]
     return [c for c in (_clean_text(i) for i in items) if c][: _MAX_LIST * 2]
 
 
@@ -75,7 +72,7 @@ class IdentityHints(BaseModel):
     def _urls(cls, value: object) -> list[str]:
         urls = []
         for item in _split_list(value):
-            if not re.match(r"^https?://", item, re.I):
+            if not re.match(r"^https?://", item, re.IGNORECASE):
                 item = "https://" + item
             if canonical_url(item).startswith("https://"):
                 urls.append(item)
@@ -89,8 +86,19 @@ class IdentityHints(BaseModel):
 
     def is_empty(self) -> bool:
         return not any(
-            [self.name, self.location, self.country, self.usernames, self.emails, self.employer,
-             self.university, self.profession, self.known_urls, self.age_min, self.age_max]
+            [
+                self.name,
+                self.location,
+                self.country,
+                self.usernames,
+                self.emails,
+                self.employer,
+                self.university,
+                self.profession,
+                self.known_urls,
+                self.age_min,
+                self.age_max,
+            ]
         )
 
     def normalized(self) -> dict[str, object]:

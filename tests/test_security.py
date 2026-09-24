@@ -9,8 +9,23 @@ from tests.conftest import make_settings
 from tests.fakes import WebWorld, make_image, public_resolver
 
 
-@pytest.mark.parametrize("ip", ["127.0.0.1", "10.1.2.3", "172.16.0.1", "192.168.1.1", "169.254.169.254", "::1",
-                                "fe80::1", "fd00::1", "::ffff:127.0.0.1", "0.0.0.0", "100.64.0.1", "fd00:ec2::254"])
+@pytest.mark.parametrize(
+    "ip",
+    [
+        "127.0.0.1",
+        "10.1.2.3",
+        "172.16.0.1",
+        "192.168.1.1",
+        "169.254.169.254",
+        "::1",
+        "fe80::1",
+        "fd00::1",
+        "::ffff:127.0.0.1",
+        "0.0.0.0",
+        "100.64.0.1",
+        "fd00:ec2::254",
+    ],
+)
 def test_blocks_private_ips(ip):
     assert not is_ip_allowed(ip)
 
@@ -19,9 +34,20 @@ def test_allows_public_ips():
     assert is_ip_allowed("93.184.216.34") and is_ip_allowed("2606:4700:4700::1111")
 
 
-@pytest.mark.parametrize("url", ["file:///etc/passwd", "gopher://x", "http://localhost/x", "http://127.0.0.1/",
-                                 "http://user:pw@example.com/", "http://metadata.google.internal/", "http://2130706433/",
-                                 "http://[::1]/", "ftp://example.com/"])
+@pytest.mark.parametrize(
+    "url",
+    [
+        "file:///etc/passwd",
+        "gopher://x",
+        "http://localhost/x",
+        "http://127.0.0.1/",
+        "http://user:pw@example.com/",
+        "http://metadata.google.internal/",
+        "http://2130706433/",
+        "http://[::1]/",
+        "ftp://example.com/",
+    ],
+)
 def test_rejects_dangerous_urls(url):
     with pytest.raises(BlockedURLError):
         parse_public_url(url)
@@ -34,7 +60,9 @@ async def test_resolution_to_private_address_is_blocked():
 
 
 def fetcher(tmp_path, world: WebWorld, **kw) -> SafeFetcher:
-    return SafeFetcher(make_settings(tmp_path, **kw), resolver=public_resolver, transport=httpx.MockTransport(world.handler))
+    return SafeFetcher(
+        make_settings(tmp_path, **kw), resolver=public_resolver, transport=httpx.MockTransport(world.handler)
+    )
 
 
 async def test_fetcher_blocks_redirect_to_private_network(tmp_path):
@@ -75,6 +103,7 @@ async def test_fetcher_limits_redirects_size_and_types(tmp_path):
 
 async def test_guarded_backend_pins_validated_ips(tmp_path):
     """Direct mode: the connection layer itself refuses private resolutions (DNS rebinding)."""
+
     async def rebinding(host, port):
         return ["127.0.0.1"]
 
@@ -91,7 +120,9 @@ async def _noop():
 
 
 def test_redaction():
-    text = redact("GET https://vision.googleapis.com/v1?key=AIzaSECRET token=abc Cookie: li_at=zzz Authorization: Bearer xyz")
+    text = redact(
+        "GET https://vision.googleapis.com/v1?key=AIzaSECRET token=abc Cookie: li_at=zzz Authorization: Bearer xyz"
+    )
     for secret in ("AIzaSECRET", "abc", "zzz", "xyz"):
         assert secret not in text
 
@@ -103,8 +134,13 @@ def test_session_store_never_exposes_cookie_values(tmp_path):
     s = make_settings(tmp_path, session_persistence_enabled=True, session_encryption_key=key)
     s.session_dir.mkdir(parents=True, exist_ok=True)
     store = SessionStore(s)
-    store.save("linkedin", [{"name": "li_at", "value": "SECRETVALUE", "domain": ".linkedin.com", "expires": -1},
-                            {"name": "evil", "value": "x", "domain": ".attacker.com"}])
+    store.save(
+        "linkedin",
+        [
+            {"name": "li_at", "value": "SECRETVALUE", "domain": ".linkedin.com", "expires": -1},
+            {"name": "evil", "value": "x", "domain": ".attacker.com"},
+        ],
+    )
     status = store.status("linkedin")
     assert status["status"] == "logged_in" and status["cookie_count"] == 1
     assert "SECRETVALUE" not in str(store.all_status())

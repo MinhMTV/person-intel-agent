@@ -51,7 +51,9 @@ class ReferenceImageService:
     async def add(self, investigation_id: str, filename: str | None, data: bytes) -> ReferenceImage:
         existing = self.repo.get_reference_images(investigation_id)
         if len(existing) >= self.settings.max_reference_images:
-            raise ReferenceImageError("too_many", f"At most {self.settings.max_reference_images} reference images are allowed.")
+            raise ReferenceImageError(
+                "too_many", f"At most {self.settings.max_reference_images} reference images are allowed."
+            )
         validated: ValidatedImage = await asyncio.to_thread(
             validate_image_bytes,
             data,
@@ -144,21 +146,10 @@ class ReferenceImageService:
         return True
 
     def read_bytes(self, ref: ReferenceImage) -> bytes | None:
-        if not ref.stored_path:
-            return None
-        path = Path(ref.stored_path)
-        try:
-            path.resolve().relative_to(self.settings.upload_dir.resolve())
-        except ValueError:
-            return None  # never read outside the upload directory
-        return path.read_bytes() if path.exists() else None
+        path = self.settings.upload_path(ref.stored_path)  # never read outside the upload directory
+        return path.read_bytes() if path and path.exists() else None
 
     def _unlink(self, stored_path: str | None) -> None:
-        if not stored_path:
-            return
-        path = Path(stored_path)
-        try:
-            path.resolve().relative_to(self.settings.upload_dir.resolve())
-        except ValueError:
-            return
-        path.unlink(missing_ok=True)
+        path = self.settings.upload_path(stored_path)
+        if path:
+            path.unlink(missing_ok=True)

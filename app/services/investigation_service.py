@@ -1,9 +1,9 @@
 """The single investigation pipeline used by REST, SSE/live progress, CLI and UI.
 
-    reference images → reverse image discovery ┐
-                                               ├→ candidate pages → page analysis → candidate images
-    identity hints   → parameter discovery ────┘        → faces/embeddings → face matching
-    → text evidence → clustering → evidence fusion → ranking → leads → persisted result
+reference images → reverse image discovery ┐
+                                           ├→ candidate pages → page analysis → candidate images
+identity hints   → parameter discovery ────┘        → faces/embeddings → face matching
+→ text evidence → clustering → evidence fusion → ranking → leads → persisted result
 """
 
 from __future__ import annotations
@@ -80,8 +80,17 @@ class PageRegistry:
     def pages(self) -> list[CandidatePage]:
         return sorted(self._pages.values(), key=lambda p: min((_ORIGIN_PRIORITY[o] for o in p.origins), default=9))
 
-    def add(self, url: str, origin: DiscoveryOrigin, provider: str | None = None, *, title: str | None = None,
-            snippet: str | None = None, query: str | None = None, image_only: bool = False) -> CandidatePage | None:
+    def add(
+        self,
+        url: str,
+        origin: DiscoveryOrigin,
+        provider: str | None = None,
+        *,
+        title: str | None = None,
+        snippet: str | None = None,
+        query: str | None = None,
+        image_only: bool = False,
+    ) -> CandidatePage | None:
         key = canonical_url(url)
         if not key.startswith("https://") or is_noise_domain(url):
             return None
@@ -91,8 +100,12 @@ class PageRegistry:
             if same_kind >= (self.max_image_only if image_only else self.max_pages):
                 return None
             page = CandidatePage(
-                id=stable_hash(key, 12), url=url, canonical_url=key, domain=domain_of(url),
-                platform=platform_for(url), is_image_only=image_only,
+                id=stable_hash(key, 12),
+                url=url,
+                canonical_url=key,
+                domain=domain_of(url),
+                platform=platform_for(url),
+                is_image_only=image_only,
             )
             self._pages[key] = page
         if origin not in page.origins:
@@ -110,10 +123,17 @@ class PageRegistry:
         canon = canonical_image_url(url)
         if not canon.startswith("https://") or any(i.canonical_url == canon for i in page.images):
             return
-        page.images.append(CandidateImage(
-            id=stable_hash([page.id, canon], 12), url=url, canonical_url=canon, page_url=page.url,
-            origin=origin, priority=priority, provider=provider,
-        ))
+        page.images.append(
+            CandidateImage(
+                id=stable_hash([page.id, canon], 12),
+                url=url,
+                canonical_url=canon,
+                page_url=page.url,
+                origin=origin,
+                priority=priority,
+                provider=provider,
+            )
+        )
 
 
 @dataclass
@@ -156,8 +176,9 @@ class InvestigationService:
 
     # ------------------------------------------------------------------ lifecycle
     def create(self, hints: IdentityHints | None = None, options: InvestigationOptions | None = None) -> Investigation:
-        inv = Investigation(id=uuid.uuid4().hex[:16], hints=hints or IdentityHints(),
-                            options=options or InvestigationOptions())
+        inv = Investigation(
+            id=uuid.uuid4().hex[:16], hints=hints or IdentityHints(), options=options or InvestigationOptions()
+        )
         self.repo.create(inv)
         return inv
 
@@ -174,16 +195,18 @@ class InvestigationService:
 
     def fingerprint(self, inv: Investigation, refs: list[ReferenceImage]) -> str:
         """Deterministic hash of every input that can affect the result."""
-        return stable_hash({
-            "hints": inv.hints.normalized(),
-            "options": inv.options.normalized(),
-            "references": sorted((r.sha256, r.phash, r.selected_face_id or "") for r in refs),
-            "reverse_providers": [p.cache_identity() for p in self.image_discovery.configured_providers()],
-            "search_providers": [p.name for p in self.candidate_discovery.search_providers if p.is_configured()],
-            "profile_providers": [p.name for p in self.candidate_discovery.profile_providers if p.is_configured()],
-            "face_model": self.faces.model_name if self.faces.matching_available else None,
-            "config": self.settings.config_fingerprint(),
-        })
+        return stable_hash(
+            {
+                "hints": inv.hints.normalized(),
+                "options": inv.options.normalized(),
+                "references": sorted((r.sha256, r.phash, r.selected_face_id or "") for r in refs),
+                "reverse_providers": [p.cache_identity() for p in self.image_discovery.configured_providers()],
+                "search_providers": [p.name for p in self.candidate_discovery.search_providers if p.is_configured()],
+                "profile_providers": [p.name for p in self.candidate_discovery.profile_providers if p.is_configured()],
+                "face_model": self.faces.model_name if self.faces.matching_available else None,
+                "config": self.settings.config_fingerprint(),
+            }
+        )
 
     def validate_runnable(self, inv: Investigation) -> None:
         if not inv.reference_images and inv.hints.is_empty():
@@ -206,26 +229,43 @@ class InvestigationService:
         started = utcnow()
         t0 = time.perf_counter()
         try:
-            ctx.emit(EventType.INVESTIGATION_STARTED, "Investigation started",
-                     reference_images=len(refs), hints_supplied=not inv.hints.is_empty())
+            ctx.emit(
+                EventType.INVESTIGATION_STARTED,
+                "Investigation started",
+                reference_images=len(refs),
+                hints_supplied=not inv.hints.is_empty(),
+            )
             ref_faces = self._reference_stage(refs, ctx)
-            state = _State(PageRegistry(inv.options.max_candidate_pages or self.settings.max_candidate_pages,
-                                        self.settings.max_similar_images + 10))
+            state = _State(
+                PageRegistry(
+                    inv.options.max_candidate_pages or self.settings.max_candidate_pages,
+                    self.settings.max_similar_images + 10,
+                )
+            )
             status = InvestigationStatus.COMPLETED
             try:
-                await asyncio.wait_for(self._collect(inv, refs, ref_faces, ctx, state),
-                                       timeout=self.settings.investigation_timeout)
+                await asyncio.wait_for(
+                    self._collect(inv, refs, ref_faces, ctx, state), timeout=self.settings.investigation_timeout
+                )
             except TimeoutError:
                 status = InvestigationStatus.PARTIAL
-                ctx.warn(f"Investigation time limit ({self.settings.investigation_timeout}s) reached — "
-                         "results are based on the sources processed so far.")
+                ctx.warn(
+                    f"Investigation time limit ({self.settings.investigation_timeout}s) reached — "
+                    "results are based on the sources processed so far."
+                )
 
             nodes = self._page_nodes(state, refs, inv.hints)
             candidates = self.ranking.rank(self.clustering.cluster(nodes), inv.hints, self.faces.matching_available)
             for candidate in candidates[:25]:
-                ctx.emit(EventType.CANDIDATE_UPDATED, f"{candidate.display_name}: {candidate.assessment.level.value}",
-                         candidate_id=candidate.id, name=candidate.display_name, rank=candidate.rank,
-                         level=candidate.assessment.level.value, sources=len(candidate.urls))
+                ctx.emit(
+                    EventType.CANDIDATE_UPDATED,
+                    f"{candidate.display_name}: {candidate.assessment.level.value}",
+                    candidate_id=candidate.id,
+                    name=candidate.display_name,
+                    rank=candidate.rank,
+                    level=candidate.assessment.level.value,
+                    sources=len(candidate.urls),
+                )
             pages = state.registry.pages
             try:
                 leads = await asyncio.wait_for(self.leads.collect(inv.hints, pages, candidates), timeout=30)
@@ -263,8 +303,13 @@ class InvestigationService:
             self.repo.save_result(result)
             inv.status = status
             self.repo.update_meta(inv)
-            ctx.emit(EventType.INVESTIGATION_COMPLETED, result.conclusion, status=status.value,
-                     candidates=len(candidates), duration_ms=ctx.stats.duration_ms)
+            ctx.emit(
+                EventType.INVESTIGATION_COMPLETED,
+                result.conclusion,
+                status=status.value,
+                candidates=len(candidates),
+                duration_ms=ctx.stats.duration_ms,
+            )
             return result
         except asyncio.CancelledError:
             self.repo.set_status(investigation_id, InvestigationStatus.INTERRUPTED, "Cancelled")
@@ -279,26 +324,51 @@ class InvestigationService:
     # ----------------------------------------------------------------- stages
     def _reference_stage(self, refs: list[ReferenceImage], ctx: RunContext) -> list[ReferenceFace]:
         for ref in refs:
-            ctx.emit(EventType.IMAGE_VALIDATED, f"Reference image {ref.width}×{ref.height} ({ref.quality.label.value})",
-                     image_id=ref.id, width=ref.width, height=ref.height, quality=ref.quality.label.value,
-                     issues=ref.quality.issues)
-            ctx.emit(EventType.FACE_DETECTED, f"{len(ref.faces)} face(s) detected", image_id=ref.id,
-                     faces=len(ref.faces), selected_face_id=ref.selected_face_id)
+            ctx.emit(
+                EventType.IMAGE_VALIDATED,
+                f"Reference image {ref.width}×{ref.height} ({ref.quality.label.value})",
+                image_id=ref.id,
+                width=ref.width,
+                height=ref.height,
+                quality=ref.quality.label.value,
+                issues=ref.quality.issues,
+            )
+            ctx.emit(
+                EventType.FACE_DETECTED,
+                f"{len(ref.faces)} face(s) detected",
+                image_id=ref.id,
+                faces=len(ref.faces),
+                selected_face_id=ref.selected_face_id,
+            )
             face = ref.selected_face
             if face is not None and face.embedding is not None:
-                ctx.emit(EventType.REFERENCE_EMBEDDING_CREATED, f"{self.faces.model_name} embedding ready",
-                         image_id=ref.id, face_id=face.id, model=self.faces.model_name)
+                ctx.emit(
+                    EventType.REFERENCE_EMBEDDING_CREATED,
+                    f"{self.faces.model_name} embedding ready",
+                    image_id=ref.id,
+                    face_id=face.id,
+                    model=self.faces.model_name,
+                )
             if ref.quality.label.value == "POOR":
                 ctx.warn(f"Reference image {ref.filename or ref.id}: quality POOR — matching may be unreliable.")
         ref_faces = self.faces.reference_faces(refs)
         if refs and not ref_faces:
-            ctx.warn((self.faces.unavailable_reason or "Face matching is unavailable.") if not self.faces.matching_available else
-                     "No target face embedding available (no face detected or embeddings expired); "
-                     "face matching is skipped.")
+            ctx.warn(
+                (self.faces.unavailable_reason or "Face matching is unavailable.")
+                if not self.faces.matching_available
+                else "No target face embedding available (no face detected or embeddings expired); "
+                "face matching is skipped."
+            )
         return ref_faces
 
-    async def _collect(self, inv: Investigation, refs: list[ReferenceImage], ref_faces: list[ReferenceFace],
-                       ctx: RunContext, state: _State) -> None:
+    async def _collect(
+        self,
+        inv: Investigation,
+        refs: list[ReferenceImage],
+        ref_faces: list[ReferenceFace],
+        ctx: RunContext,
+        state: _State,
+    ) -> None:
         hints = inv.hints
         payloads: list[tuple[ReferenceImage, bytes]] = []
         for ref in refs:
@@ -331,8 +401,13 @@ class InvestigationService:
                 await self.page_analysis.analyze(page, ctx)
             state.text_evidence[page.id] = self.text_evidence.evaluate(page, hints)
             if state.text_evidence[page.id]:
-                ctx.emit(EventType.TEXT_EVIDENCE_FOUND, f"Identity hints matched on {page.domain}",
-                         page_id=page.id, url=page.url, types=sorted({e.type.value for e in state.text_evidence[page.id]}))
+                ctx.emit(
+                    EventType.TEXT_EVIDENCE_FOUND,
+                    f"Identity hints matched on {page.domain}",
+                    page_id=page.id,
+                    url=page.url,
+                    types=sorted({e.type.value for e in state.text_evidence[page.id]}),
+                )
 
         await asyncio.gather(*(analyze(p) for p in state.registry.pages))
 
@@ -341,8 +416,16 @@ class InvestigationService:
         await self.candidate_images.process(images, ctx)
         self._match_faces(state, refs, ref_faces, ctx)
 
-    def _register_pages(self, state: _State, hints: IdentityHints, reverse: ImageDiscoveryOutcome,
-                        profiles: list[ProfileRecord], hits: list, entity_hits: list, ctx: RunContext) -> None:
+    def _register_pages(
+        self,
+        state: _State,
+        hints: IdentityHints,
+        reverse: ImageDiscoveryOutcome,
+        profiles: list[ProfileRecord],
+        hits: list,
+        entity_hits: list,
+        ctx: RunContext,
+    ) -> None:
         registry = state.registry
         for url in hints.known_urls:
             registry.add(url, DiscoveryOrigin.KNOWN_URL, "investigator")
@@ -351,7 +434,9 @@ class InvestigationService:
             if result.match_type != ImageMatchType.VISUALLY_SIMILAR and result.image_url:
                 state.reference_copy_urls.add(canonical_image_url(result.image_url))
             if result.page_url:
-                page = registry.add(result.page_url, DiscoveryOrigin.REVERSE_IMAGE, result.provider, title=result.page_title)
+                page = registry.add(
+                    result.page_url, DiscoveryOrigin.REVERSE_IMAGE, result.provider, title=result.page_title
+                )
                 if page is None:
                     continue
                 page.image_hits.append(result)
@@ -362,31 +447,55 @@ class InvestigationService:
                     if similar >= self.settings.max_similar_images:
                         continue
                     similar += 1
-                page = registry.add(result.image_url, DiscoveryOrigin.REVERSE_IMAGE, result.provider,
-                                    title=f"Image on {domain_of(result.image_url)}", image_only=True)
+                page = registry.add(
+                    result.image_url,
+                    DiscoveryOrigin.REVERSE_IMAGE,
+                    result.provider,
+                    title=f"Image on {domain_of(result.image_url)}",
+                    image_only=True,
+                )
                 if page is None:
                     continue
                 page.image_hits.append(result)
                 registry.add_image(page, result.image_url, ImageOrigin.PROVIDER_MATCH, 1.0, result.provider)
         for record in profiles:
-            page = registry.add(record.url, DiscoveryOrigin.PROFILE_PROVIDER, record.provider, title=record.display_name,
-                                snippet=record.bio, query=record.lookup)
+            page = registry.add(
+                record.url,
+                DiscoveryOrigin.PROFILE_PROVIDER,
+                record.provider,
+                title=record.display_name,
+                snippet=record.bio,
+                query=record.lookup,
+            )
             if page is None:
                 continue
             self._apply_profile(page, record)
             if record.avatar_url:
                 registry.add_image(page, record.avatar_url, ImageOrigin.PROFILE_API, 0.95, record.provider)
         for hit in hits:
-            page = registry.add(hit.url, DiscoveryOrigin.WEB_SEARCH, hit.provider, title=hit.title, snippet=hit.snippet,
-                                query=hit.query)
+            page = registry.add(
+                hit.url, DiscoveryOrigin.WEB_SEARCH, hit.provider, title=hit.title, snippet=hit.snippet, query=hit.query
+            )
             if page is not None and hit.image_url:
                 registry.add_image(page, hit.image_url, ImageOrigin.INLINE, 0.5, hit.provider)
         for hit in entity_hits:
-            registry.add(hit.url, DiscoveryOrigin.WEB_ENTITY_HINT, hit.provider, title=hit.title, snippet=hit.snippet,
-                         query=hit.query)
+            registry.add(
+                hit.url,
+                DiscoveryOrigin.WEB_ENTITY_HINT,
+                hit.provider,
+                title=hit.title,
+                snippet=hit.snippet,
+                query=hit.query,
+            )
         for page in registry.pages:
-            ctx.emit(EventType.CANDIDATE_PAGE_DISCOVERED, page.title or page.domain, page_id=page.id, url=page.url,
-                     origins=[o.value for o in page.origins], providers=page.providers)
+            ctx.emit(
+                EventType.CANDIDATE_PAGE_DISCOVERED,
+                page.title or page.domain,
+                page_id=page.id,
+                url=page.url,
+                origins=[o.value for o in page.origins],
+                providers=page.providers,
+            )
 
     @staticmethod
     def _apply_profile(page: CandidatePage, record: ProfileRecord) -> None:
@@ -404,13 +513,17 @@ class InvestigationService:
             x for x in [record.display_name, record.bio, record.location, record.organization, record.website] if x
         )
 
-    def _match_faces(self, state: _State, refs: list[ReferenceImage], ref_faces: list[ReferenceFace], ctx: RunContext) -> None:
+    def _match_faces(
+        self, state: _State, refs: list[ReferenceImage], ref_faces: list[ReferenceFace], ctx: RunContext
+    ) -> None:
         if not ref_faces:
             return
         ref_hashes = [r.phash for r in refs]
         for page in state.registry.pages:
             for image in page.images:
-                if image.phash and any(hamming_distance(image.phash, h) <= self.settings.phash_duplicate_distance for h in ref_hashes):
+                if image.phash and any(
+                    hamming_distance(image.phash, h) <= self.settings.phash_duplicate_distance for h in ref_hashes
+                ):
                     state.reference_copy_urls.add(image.canonical_url)
                 if image.canonical_url in state.face_matches or not image.faces:
                     continue
@@ -420,10 +533,15 @@ class InvestigationService:
                 ctx.stats.face_comparisons += len(image.faces) * len(ref_faces)
                 state.face_matches[image.canonical_url] = match
                 if match.comparison.band.rank >= FaceMatchBand.MEDIUM.rank:
-                    ctx.emit(EventType.FACE_MATCH_FOUND, f"Face similarity {match.comparison.band.value} on {page.domain}",
-                             url=image.url, page_url=page.url, band=match.comparison.band.value,
-                             cosine_similarity=match.comparison.cosine_similarity,
-                             reference_copy=image.canonical_url in state.reference_copy_urls)
+                    ctx.emit(
+                        EventType.FACE_MATCH_FOUND,
+                        f"Face similarity {match.comparison.band.value} on {page.domain}",
+                        url=image.url,
+                        page_url=page.url,
+                        band=match.comparison.band.value,
+                        cosine_similarity=match.comparison.cosine_similarity,
+                        reference_copy=image.canonical_url in state.reference_copy_urls,
+                    )
 
     def _page_nodes(self, state: _State, refs: list[ReferenceImage], hints: IdentityHints) -> list[PageNode]:
         ref_hashes = [r.phash for r in refs]
@@ -439,26 +557,40 @@ class InvestigationService:
             weak_face: FaceEvidence | None = None
             for image in page.images:
                 is_copy = image.canonical_url in state.reference_copy_urls or (
-                    image.phash is not None and any(hamming_distance(image.phash, h) <= self.settings.phash_duplicate_distance
-                                                    for h in ref_hashes))
+                    image.phash is not None
+                    and any(
+                        hamming_distance(image.phash, h) <= self.settings.phash_duplicate_distance for h in ref_hashes
+                    )
+                )
                 if is_copy and image.canonical_url not in hit_images:
-                    evidence.append(image_occurrence_evidence(
-                        ImageDiscoveryResult(provider="local_phash", match_type=ImageMatchType.EXACT, image_url=image.url,
-                                             page_url=page.url if not page.is_image_only else None,
-                                             reference_image_id=refs[0].id if refs else None),
-                        source,
-                    ))
+                    evidence.append(
+                        image_occurrence_evidence(
+                            ImageDiscoveryResult(
+                                provider="local_phash",
+                                match_type=ImageMatchType.EXACT,
+                                image_url=image.url,
+                                page_url=page.url if not page.is_image_only else None,
+                                reference_image_id=refs[0].id if refs else None,
+                            ),
+                            source,
+                        )
+                    )
                 match = state.face_matches.get(image.canonical_url)
                 if match is None or is_copy:
                     # A copy of the reference photo trivially matches its own face;
                     # that is image-occurrence evidence, not independent face evidence.
                     continue
                 fe = FaceEvidence(
-                    model=model, distance=match.comparison.distance,
-                    cosine_similarity=match.comparison.cosine_similarity, match_band=match.comparison.band,
-                    reference_image_id=match.reference.reference_image_id, reference_face_id=match.reference.face_id,
-                    references_compared=match.comparison.references_compared, candidate_image_url=image.url,
-                    candidate_face_id=match.face.id, candidate_bbox=match.face.bbox,
+                    model=model,
+                    distance=match.comparison.distance,
+                    cosine_similarity=match.comparison.cosine_similarity,
+                    match_band=match.comparison.band,
+                    reference_image_id=match.reference.reference_image_id,
+                    reference_face_id=match.reference.face_id,
+                    references_compared=match.comparison.references_compared,
+                    candidate_image_url=image.url,
+                    candidate_face_id=match.face.id,
+                    candidate_bbox=match.face.bbox,
                     candidate_thumbnail=match.face.thumbnail,
                 )
                 if fe.match_band.rank >= FaceMatchBand.MEDIUM.rank:
@@ -469,15 +601,22 @@ class InvestigationService:
                     best = (fe, match.face.embedding)
             if weak_face is not None and not any(e.face for e in evidence):
                 evidence.append(face_evidence(weak_face, source))  # counter-evidence: compared, did not match
-            evidence.extend(state.text_evidence.get(page.id) or self.text_evidence.evaluate(page, hints))
-            nodes.append(PageNode(
-                page=page, evidence=evidence,
-                best_face=best[0] if best else None,
-                best_face_embedding=np.asarray(best[1]) if best and best[1] is not None else None,
-            ))
+            if page.id in state.text_evidence:
+                evidence.extend(state.text_evidence[page.id])
+            else:  # page not reached before the time limit
+                evidence.extend(self.text_evidence.evaluate(page, hints))
+            nodes.append(
+                PageNode(
+                    page=page,
+                    evidence=evidence,
+                    best_face=best[0] if best else None,
+                    best_face_embedding=np.asarray(best[1]) if best and best[1] is not None else None,
+                )
+            )
         return nodes
 
     # ---------------------------------------------------------------- listing
-    def list_investigations(self, *, limit: int = 50, tag: str | None = None,
-                            query: str | None = None) -> list[Investigation]:
+    def list_investigations(
+        self, *, limit: int = 50, tag: str | None = None, query: str | None = None
+    ) -> list[Investigation]:
         return self.repo.list_investigations(limit=limit, tag=tag, query=query)

@@ -7,6 +7,7 @@ face-crop thumbnails.
 
 from __future__ import annotations
 
+import contextlib
 import csv
 import html
 import io
@@ -43,10 +44,16 @@ def _filename(inv: Investigation) -> str:
 def _hints_rows(result: InvestigationResult) -> list[tuple[str, str]]:
     h = result.hints
     rows = [
-        ("Name", h.name), ("Location", h.location), ("Country", h.country),
+        ("Name", h.name),
+        ("Location", h.location),
+        ("Country", h.country),
         ("Age range", f"{h.age_min or '?'}–{h.age_max or '?'}" if (h.age_min or h.age_max) else None),
-        ("Usernames", ", ".join(h.usernames)), ("Emails", ", ".join(h.emails)), ("Employer", h.employer),
-        ("University", h.university), ("Profession", h.profession), ("Known URLs", ", ".join(h.known_urls)),
+        ("Usernames", ", ".join(h.usernames)),
+        ("Emails", ", ".join(h.emails)),
+        ("Employer", h.employer),
+        ("University", h.university),
+        ("Profession", h.profession),
+        ("Known URLs", ", ".join(h.known_urls)),
     ]
     return [(k, str(v)) for k, v in rows if v]
 
@@ -75,8 +82,12 @@ class ReportService:
             "generator": f"person-intel-agent {__version__}",
             "disclaimer": DISCLAIMER,
             "investigation": {
-                "id": inv.id, "title": inv.title, "status": inv.status.value,
-                "created_at": inv.created_at.isoformat(), "tags": inv.tags, "pinned": inv.pinned,
+                "id": inv.id,
+                "title": inv.title,
+                "status": inv.status.value,
+                "created_at": inv.created_at.isoformat(),
+                "tags": inv.tags,
+                "pinned": inv.pinned,
                 "notes": [{"text": n.text, "created_at": n.created_at.isoformat()} for n in inv.notes],
             },
             "result": _strip(result.model_dump(mode="json")) if result else None,
@@ -89,20 +100,33 @@ class ReportService:
     def to_markdown(self, inv: Investigation) -> str:
         r = inv.result
         lines = [f"# Investigation: {inv.title}", "", f"> {DISCLAIMER}", ""]
-        lines += [f"- **ID:** {inv.id}", f"- **Status:** {inv.status.value}", f"- **Created:** {inv.created_at:%Y-%m-%d %H:%M} UTC"]
+        lines += [
+            f"- **ID:** {inv.id}",
+            f"- **Status:** {inv.status.value}",
+            f"- **Created:** {inv.created_at:%Y-%m-%d %H:%M} UTC",
+        ]
         if inv.tags:
             lines.append(f"- **Tags:** {', '.join(inv.tags)}")
         if r is None:
             lines += ["", "_This investigation has not produced results yet._"]
             return "\n".join(lines)
-        lines += [f"- **Pipeline version:** {r.pipeline_version} · fingerprint `{r.fingerprint[:16]}`",
-                  f"- **Face model:** {r.face_model or 'unavailable'}", "", "## Conclusion", "", r.conclusion, ""]
+        lines += [
+            f"- **Pipeline version:** {r.pipeline_version} · fingerprint `{r.fingerprint[:16]}`",
+            f"- **Face model:** {r.face_model or 'unavailable'}",
+            "",
+            "## Conclusion",
+            "",
+            r.conclusion,
+            "",
+        ]
         hints = _hints_rows(r)
         lines += ["## Inputs", ""]
         lines += [f"- {k}: {v}" for k, v in hints] or ["- No identity hints supplied (image-only search)."]
         for ref in r.reference_images:
-            lines.append(f"- Reference image {ref.filename or ref.id}: {ref.width}×{ref.height}, quality "
-                         f"{ref.quality.label.value}, {len(ref.faces)} face(s), sha256 `{ref.sha256[:16]}…`")
+            lines.append(
+                f"- Reference image {ref.filename or ref.id}: {ref.width}×{ref.height}, quality "
+                f"{ref.quality.label.value}, {len(ref.faces)} face(s), sha256 `{ref.sha256[:16]}…`"
+            )
         lines.append("")
         lines += ["## Candidates", ""]
         if not r.candidates:
@@ -111,9 +135,11 @@ class ReportService:
             lines += [f"### {c.rank}. {c.display_name} — {c.assessment.level.value}", ""]
             lines += ["| Signal | Value |", "|---|---|"] + [f"| {k} | {v} |" for k, v in _summary_rows(c)]
             if c.best_face:
-                lines.append(f"\nBest face comparison: {c.best_face.model}, cosine similarity "
-                             f"{c.best_face.cosine_similarity:.3f}, distance {c.best_face.distance:.3f} "
-                             f"({c.best_face.match_band.value}).")
+                lines.append(
+                    f"\nBest face comparison: {c.best_face.model}, cosine similarity "
+                    f"{c.best_face.cosine_similarity:.3f}, distance {c.best_face.distance:.3f} "
+                    f"({c.best_face.match_band.value})."
+                )
             lines += ["", "**Why:**"] + [f"- {x}" for x in c.assessment.reasons]
             if c.assessment.caveats:
                 lines += ["", "**Caveats:**"] + [f"- {x}" for x in c.assessment.caveats]
@@ -122,32 +148,52 @@ class ReportService:
                 lines += ["", "**Why these sources were grouped:**"] + [f"- {x}" for x in c.cluster_reasons]
             lines += ["", "**Evidence (observations):**"]
             for ev in c.evidence:
-                lines.append(f"- [{ev.type.value} · {ev.strength.value}] {ev.observation}"
-                             + (f" — {ev.source_url}" if ev.source_url else ""))
+                lines.append(
+                    f"- [{ev.type.value} · {ev.strength.value}] {ev.observation}"
+                    + (f" — {ev.source_url}" if ev.source_url else "")
+                )
             lines.append("")
         if r.reverse_image_results:
             lines += ["## Reverse image results", ""]
             for res in r.reverse_image_results[:50]:
-                lines.append(f"- {res.provider} · {res.match_type.value} · page: {res.page_url or '—'} · image: {res.image_url or '—'}")
+                lines.append(
+                    f"- {res.provider} · {res.match_type.value} · page: {res.page_url or '—'} · image: {res.image_url or '—'}"
+                )
             lines.append("")
         if r.web_entities or r.best_guess_labels:
             lines += ["## Web entities (provider labels — not identity evidence)", ""]
             lines += [f"- Best guess: {x}" for x in r.best_guess_labels]
-            lines += [f"- {e.description} ({e.score:.2f})" if e.score is not None else f"- {e.description}" for e in r.web_entities]
+            lines += [
+                f"- {e.description} ({e.score:.2f})" if e.score is not None else f"- {e.description}"
+                for e in r.web_entities
+            ]
             lines.append("")
         if r.leads:
             lines += ["## Leads (hypotheses and identifiers to follow up)", ""]
-            lines += [f"- {lead.classification}: {lead.value}" + (f" — {lead.note}" if lead.note else "") for lead in r.leads]
+            lines += [
+                f"- {lead.classification}: {lead.value}" + (f" — {lead.note}" if lead.note else "") for lead in r.leads
+            ]
             lines.append("")
-        lines += ["## Provider runs", "", "| Provider | Stage | Outcome | Results | ms | Cache |", "|---|---|---|---|---|---|"]
-        lines += [f"| {p.provider} | {p.stage} | {p.outcome.value} | {p.result_count} | {p.duration_ms} | {'hit' if p.cache_hit else ''} |"
-                  for p in r.provider_runs]
+        lines += [
+            "## Provider runs",
+            "",
+            "| Provider | Stage | Outcome | Results | ms | Cache |",
+            "|---|---|---|---|---|---|",
+        ]
+        lines += [
+            f"| {p.provider} | {p.stage} | {p.outcome.value} | {p.result_count} | {p.duration_ms} | {'hit' if p.cache_hit else ''} |"
+            for p in r.provider_runs
+        ]
         s = r.stats
-        lines += ["", "## Statistics", "",
-                  f"- Pages discovered: {s.pages_discovered} (fetched {s.pages_fetched})",
-                  f"- Images downloaded: {s.images_downloaded} (deduplicated {s.images_deduplicated})",
-                  f"- Faces detected: {s.faces_detected}; comparisons: {s.face_comparisons}",
-                  f"- Candidates: {s.candidate_count}; duration: {s.duration_ms} ms; cache hits/misses: {s.cache_hits}/{s.cache_misses}"]
+        lines += [
+            "",
+            "## Statistics",
+            "",
+            f"- Pages discovered: {s.pages_discovered} (fetched {s.pages_fetched})",
+            f"- Images downloaded: {s.images_downloaded} (deduplicated {s.images_deduplicated})",
+            f"- Faces detected: {s.faces_detected}; comparisons: {s.face_comparisons}",
+            f"- Candidates: {s.candidate_count}; duration: {s.duration_ms} ms; cache hits/misses: {s.cache_hits}/{s.cache_misses}",
+        ]
         if r.warnings:
             lines += ["", "## Warnings", ""] + [f"- {w}" for w in r.warnings]
         if inv.notes:
@@ -181,27 +227,47 @@ class ReportService:
         parts.append(f"<h2>Conclusion</h2><p>{e(r.conclusion)}</p><h2>Inputs</h2><ul>")
         hints = _hints_rows(r)
         parts += [f"<li>{e(k)}: {e(v)}</li>" for k, v in hints] or ["<li>No identity hints (image-only search).</li>"]
-        parts += [f"<li>Reference image {e(ref.filename or ref.id)}: {ref.width}×{ref.height}, quality "
-                  f"{e(ref.quality.label.value)}, {len(ref.faces)} face(s)</li>" for ref in r.reference_images]
+        parts += [
+            f"<li>Reference image {e(ref.filename or ref.id)}: {ref.width}×{ref.height}, quality "
+            f"{e(ref.quality.label.value)}, {len(ref.faces)} face(s)</li>"
+            for ref in r.reference_images
+        ]
         parts.append("</ul><h2>Candidates</h2>")
         for c in r.candidates:
-            parts.append(f"<h3>{c.rank}. {e(c.display_name)} — <span class='lvl'>{e(c.assessment.level.value)}</span></h3><table>")
+            parts.append(
+                f"<h3>{c.rank}. {e(c.display_name)} — <span class='lvl'>{e(c.assessment.level.value)}</span></h3><table>"
+            )
             parts += [f"<tr><th>{e(k)}</th><td>{e(v)}</td></tr>" for k, v in _summary_rows(c)]
             parts.append("</table><p><b>Why</b></p><ul>")
             parts += [f"<li>{e(x)}</li>" for x in c.assessment.reasons]
             parts.append("</ul>")
             if c.assessment.caveats:
-                parts.append("<p><b>Caveats</b></p><ul>" + "".join(f"<li>{e(x)}</li>" for x in c.assessment.caveats) + "</ul>")
+                parts.append(
+                    "<p><b>Caveats</b></p><ul>" + "".join(f"<li>{e(x)}</li>" for x in c.assessment.caveats) + "</ul>"
+                )
             parts.append("<p><b>Sources</b></p><ul>" + "".join(f"<li>{link(u)}</li>" for u in c.urls) + "</ul>")
             parts.append("<p><b>Evidence (observations)</b></p><ul>")
-            parts += [f"<li>[{e(ev.type.value)} · {e(ev.strength.value)}] {e(ev.observation)} {link(ev.source_url)}</li>" for ev in c.evidence]
+            parts += [
+                f"<li>[{e(ev.type.value)} · {e(ev.strength.value)}] {e(ev.observation)} {link(ev.source_url)}</li>"
+                for ev in c.evidence
+            ]
             parts.append("</ul>")
         if r.leads:
-            parts.append("<h2>Leads</h2><ul>" + "".join(
-                f"<li>{e(lead.classification)}: {e(lead.value)} {e(lead.note or '')}</li>" for lead in r.leads) + "</ul>")
-        parts.append("<h2>Provider runs</h2><table><tr><th>Provider</th><th>Stage</th><th>Outcome</th><th>Results</th><th>ms</th></tr>")
-        parts += [f"<tr><td>{e(p.provider)}</td><td>{e(p.stage)}</td><td>{e(p.outcome.value)}</td><td>{p.result_count}</td>"
-                  f"<td>{p.duration_ms}</td></tr>" for p in r.provider_runs]
+            parts.append(
+                "<h2>Leads</h2><ul>"
+                + "".join(
+                    f"<li>{e(lead.classification)}: {e(lead.value)} {e(lead.note or '')}</li>" for lead in r.leads
+                )
+                + "</ul>"
+            )
+        parts.append(
+            "<h2>Provider runs</h2><table><tr><th>Provider</th><th>Stage</th><th>Outcome</th><th>Results</th><th>ms</th></tr>"
+        )
+        parts += [
+            f"<tr><td>{e(p.provider)}</td><td>{e(p.stage)}</td><td>{e(p.outcome.value)}</td><td>{p.result_count}</td>"
+            f"<td>{p.duration_ms}</td></tr>"
+            for p in r.provider_runs
+        ]
         parts.append("</table>")
         if r.warnings:
             parts.append("<h2>Warnings</h2><ul>" + "".join(f"<li>{e(w)}</li>" for w in r.warnings) + "</ul>")
@@ -214,18 +280,42 @@ class ReportService:
     def to_csv(self, inv: Investigation) -> str:
         out = io.StringIO()
         writer = csv.writer(out)
-        writer.writerow(["candidate_rank", "candidate", "evidence_level", "evidence_type", "strength", "observation",
-                         "source_url", "provider", "face_band", "cosine_similarity", "tags", "notes"])
+        writer.writerow(
+            [
+                "candidate_rank",
+                "candidate",
+                "evidence_level",
+                "evidence_type",
+                "strength",
+                "observation",
+                "source_url",
+                "provider",
+                "face_band",
+                "cosine_similarity",
+                "tags",
+                "notes",
+            ]
+        )
         tags = ", ".join(inv.tags)
         notes = " | ".join(n.text for n in inv.notes)
-        for c in (inv.result.candidates if inv.result else []):
+        for c in inv.result.candidates if inv.result else []:
             for ev in c.evidence:
-                writer.writerow([
-                    c.rank, _csv_safe(c.display_name), c.assessment.level.value, ev.type.value, ev.strength.value,
-                    _csv_safe(ev.observation), ev.source_url or "", ev.provider or "",
-                    ev.face.match_band.value if ev.face else "", f"{ev.face.cosine_similarity:.4f}" if ev.face else "",
-                    _csv_safe(tags), _csv_safe(notes),
-                ])
+                writer.writerow(
+                    [
+                        c.rank,
+                        _csv_safe(c.display_name),
+                        c.assessment.level.value,
+                        ev.type.value,
+                        ev.strength.value,
+                        _csv_safe(ev.observation),
+                        ev.source_url or "",
+                        ev.provider or "",
+                        ev.face.match_band.value if ev.face else "",
+                        f"{ev.face.cosine_similarity:.4f}" if ev.face else "",
+                        _csv_safe(tags),
+                        _csv_safe(notes),
+                    ]
+                )
         return out.getvalue()
 
     # ------------------------------------------------------------------- PDF
@@ -270,10 +360,8 @@ class ReportService:
             zf.writestr(f"{name}.md", self.to_markdown(inv))
             zf.writestr(f"{name}.html", self.to_html(inv))
             zf.writestr(f"{name}_evidence.csv", self.to_csv(inv))
-            try:
+            with contextlib.suppress(ImportError):  # fpdf2 not installed
                 zf.writestr(f"{name}.pdf", self.to_pdf(inv))
-            except ImportError:
-                pass
         return buf.getvalue()
 
     def render(self, inv: Investigation, fmt: str) -> tuple[bytes, str, str]:

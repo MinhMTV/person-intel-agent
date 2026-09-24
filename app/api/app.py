@@ -48,8 +48,10 @@ def create_app(container: Container | None = None, settings: Settings | None = N
         if settings.app_env != "production" and settings.host not in ("127.0.0.1", "localhost", "::1"):
             logger.warning("Development mode bound to a non-local interface — do not expose this publicly.")
         if settings.host not in ("127.0.0.1", "localhost", "::1") and settings.app_api_token is None:
-            logger.warning("No APP_API_TOKEN set while listening on %s: anyone who can reach the port can use the API.",
-                           settings.host)
+            logger.warning(
+                "No APP_API_TOKEN set while listening on %s: anyone who can reach the port can use the API.",
+                settings.host,
+            )
         task = asyncio.create_task(_retention_loop(c))
         try:
             yield
@@ -65,7 +67,7 @@ def create_app(container: Container | None = None, settings: Settings | None = N
     app = FastAPI(
         title="Person Intel Agent",
         description="Image-first candidate discovery and verification. Results are candidate matches that must be "
-                    "verified independently.",
+        "verified independently.",
         version=__version__,
         lifespan=lifespan,
         docs_url=None if settings.is_production else "/docs",
@@ -76,8 +78,13 @@ def create_app(container: Container | None = None, settings: Settings | None = N
         app.state.container = container
     app.add_middleware(SecurityMiddleware, settings=settings)
     if settings.cors_origins:
-        app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=False,
-                           allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"], allow_headers=["Content-Type", "X-API-Token"])
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.cors_origins,
+            allow_credentials=False,
+            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+            allow_headers=["Content-Type", "X-API-Token"],
+        )
     for module in (system, investigations, images, candidates, exports, sessions):
         app.include_router(module.router)
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

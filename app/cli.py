@@ -15,27 +15,37 @@ from rich.table import Table
 from app import __version__
 from app.config import get_settings
 from app.domain.identity import IdentityHints, InvestigationOptions
-from app.domain.investigation import EventType
+from app.domain.investigation import EventType, InvestigationResult
+from app.services.context import ProgressSink
 
 cli = typer.Typer(help="Person Intel Agent — image-first candidate discovery and verification", no_args_is_help=True)
 console = Console()
 
-_LEVEL_STYLE = {"VERY_STRONG": "bold green", "STRONG": "green", "MODERATE": "yellow", "WEAK": "dim", "INSUFFICIENT": "dim"}
+_LEVEL_STYLE = {
+    "VERY_STRONG": "bold green",
+    "STRONG": "green",
+    "MODERATE": "yellow",
+    "WEAK": "dim",
+    "INSUFFICIENT": "dim",
+}
 _QUIET_EVENTS = {EventType.PROVIDER_FINISHED, EventType.CANDIDATE_IMAGE_DOWNLOADED, EventType.CANDIDATE_PAGE_DISCOVERED}
 
 
-def _console_sink(verbose: bool):  # type: ignore[no-untyped-def]
-    def sink(type_: EventType, message: str, data: dict[str, Any]) -> None:
+def _console_sink(verbose: bool) -> ProgressSink:
+    def sink(type_: EventType, message: str, _data: dict[str, Any]) -> None:
         if type_ in _QUIET_EVENTS and not verbose:
             return
         style = "yellow" if type_ == EventType.WARNING else "cyan"
         console.print(f"[{style}]{type_.value:<28}[/{style}] {message}")
+
     return sink
 
 
 @cli.command()
 def investigate(
-    image: list[Path] = typer.Option([], "--image", "-i", exists=True, dir_okay=False, help="Reference photo (repeatable)"),
+    image: list[Path] = typer.Option(
+        [], "--image", "-i", exists=True, dir_okay=False, help="Reference photo (repeatable)"
+    ),
     name: str | None = typer.Option(None, "--name", "-n"),
     location: str | None = typer.Option(None, "--location", "-l"),
     country: str | None = typer.Option(None, "--country"),
@@ -54,8 +64,17 @@ def investigate(
     """Run an investigation from photo(s) and/or identity hints."""
     from app.container import build_container
 
-    hints = IdentityHints(name=name, location=location, country=country, usernames=username, emails=email,
-                          employer=employer, university=university, profession=profession, known_urls=url)
+    hints = IdentityHints(
+        name=name,
+        location=location,
+        country=country,
+        usernames=username,
+        emails=email,
+        employer=employer,
+        university=university,
+        profession=profession,
+        known_urls=url,
+    )
     if not image and hints.is_empty():
         console.print("[red]Provide --image and/or at least one identity hint.[/red]")
         raise typer.Exit(2)
@@ -67,8 +86,10 @@ def investigate(
             inv = container.investigations.create(hints, InvestigationOptions(use_reverse_image=not no_reverse))
             for path in image:
                 ref = await container.investigations.add_reference_image(inv.id, path.name, path.read_bytes())
-                console.print(f"📷 {path.name}: {ref.width}×{ref.height}, quality [bold]{ref.quality.label.value}[/bold], "
-                              f"{len(ref.faces)} face(s), target {ref.selected_face_id or '—'}")
+                console.print(
+                    f"📷 {path.name}: {ref.width}×{ref.height}, quality [bold]{ref.quality.label.value}[/bold], "
+                    f"{len(ref.faces)} face(s), target {ref.selected_face_id or '—'}"
+                )
                 for issue in ref.warnings:
                     console.print(f"   [yellow]⚠ {issue}[/yellow]")
                 if face and any(f.id == face for f in ref.faces):
@@ -90,7 +111,7 @@ def investigate(
     raise typer.Exit(asyncio.run(run()))
 
 
-def _print_result(result) -> None:  # type: ignore[no-untyped-def]
+def _print_result(result: InvestigationResult) -> None:
     console.print(f"\n[bold]{result.conclusion}[/bold]\n")
     table = Table(title="Candidates (evidence levels are descriptive, not probabilities)")
     for col in ("#", "Candidate", "Evidence", "Face", "Image", "Name", "Location", "Sources"):
@@ -98,9 +119,14 @@ def _print_result(result) -> None:  # type: ignore[no-untyped-def]
     for c in result.candidates[:15]:
         a = c.assessment
         table.add_row(
-            str(c.rank), c.display_name, f"[{_LEVEL_STYLE[a.level.value]}]{a.level.value}[/]",
-            a.face_band.value if a.face_band else "—", a.image_occurrence.value if a.image_occurrence else "—",
-            a.name_match.value, a.location_match.value, str(len(c.urls)),
+            str(c.rank),
+            c.display_name,
+            f"[{_LEVEL_STYLE[a.level.value]}]{a.level.value}[/]",
+            a.face_band.value if a.face_band else "—",
+            a.image_occurrence.value if a.image_occurrence else "—",
+            a.name_match.value,
+            a.location_match.value,
+            str(len(c.urls)),
         )
     console.print(table)
     for c in result.candidates[:5]:
@@ -126,8 +152,15 @@ def serve(
     if dev and settings.is_production:
         console.print("[red]--dev is not allowed when APP_ENV=production[/red]")
         raise typer.Exit(2)
-    uvicorn.run("app.api.app:app", host=host or settings.host, port=port or settings.port, reload=dev,
-                log_level=settings.log_level.lower(), proxy_headers=settings.is_production, server_header=False)
+    uvicorn.run(
+        "app.api.app:app",
+        host=host or settings.host,
+        port=port or settings.port,
+        reload=dev,
+        log_level=settings.log_level.lower(),
+        proxy_headers=settings.is_production,
+        server_header=False,
+    )
 
 
 @cli.command()
@@ -146,7 +179,9 @@ def purge() -> None:
 
 
 @cli.command("face-compare")
-def face_compare(image_a: Path = typer.Argument(..., exists=True), image_b: Path = typer.Argument(..., exists=True)) -> None:
+def face_compare(
+    image_a: Path = typer.Argument(..., exists=True), image_b: Path = typer.Argument(..., exists=True)
+) -> None:
     """Compare the largest faces of two local images (debug helper)."""
     import numpy as np
 
@@ -173,8 +208,10 @@ def face_compare(image_a: Path = typer.Argument(..., exists=True), image_b: Path
                     return
                 embeddings.append(embedding)
             cmp = faces.compare(embeddings[0], embeddings[1])
-            console.print(f"Model {faces.model_name}: cosine similarity {cmp.cosine_similarity:.4f}, "
-                          f"distance {cmp.distance:.4f} → band [bold]{cmp.band.value}[/bold] (not a probability)")
+            console.print(
+                f"Model {faces.model_name}: cosine similarity {cmp.cosine_similarity:.4f}, "
+                f"distance {cmp.distance:.4f} → band [bold]{cmp.band.value}[/bold] (not a probability)"
+            )
         finally:
             await container.aclose()
 
@@ -188,7 +225,9 @@ def import_cookies(platform: str, cookies_file: Path = typer.Argument(..., exist
 
     settings = get_settings()
     if not settings.session_persistence_enabled:
-        console.print("[yellow]SESSION_PERSISTENCE_ENABLED is false — cookies would be lost when this command exits.[/yellow]")
+        console.print(
+            "[yellow]SESSION_PERSISTENCE_ENABLED is false — cookies would be lost when this command exits.[/yellow]"
+        )
         raise typer.Exit(2)
     count = SessionStore(settings).save(platform, json.loads(cookies_file.read_text()))
     console.print(f"Stored {count} cookies for {platform}.")

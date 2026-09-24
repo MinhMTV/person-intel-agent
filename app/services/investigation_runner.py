@@ -8,6 +8,7 @@ live subscribers (SSE). The runner calls exactly the same
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from collections import defaultdict
 from collections.abc import AsyncIterator
@@ -27,19 +28,20 @@ class EventBus:
         self._subscribers: dict[str, set[asyncio.Queue[ProgressEvent]]] = defaultdict(set)
 
     def publish(self, investigation_id: str, type_: EventType, message: str, data: dict[str, Any]) -> ProgressEvent:
-        event = self.repo.append_event(ProgressEvent(investigation_id=investigation_id, type=type_, message=message, data=data))
+        event = self.repo.append_event(
+            ProgressEvent(investigation_id=investigation_id, type=type_, message=message, data=data)
+        )
         for queue in list(self._subscribers.get(investigation_id, ())):
-            try:
+            with contextlib.suppress(asyncio.QueueFull):  # slow consumer replays from the store
                 queue.put_nowait(event)
-            except asyncio.QueueFull:  # slow consumer: it will replay from the store
-                pass
         return event
 
     def sink_for(self, investigation_id: str):  # type: ignore[no-untyped-def]
         return lambda type_, message, data: self.publish(investigation_id, type_, message, data)
 
-    async def subscribe(self, investigation_id: str, after_seq: int = 0, *, is_active: bool = True,
-                        heartbeat: float = 15.0) -> AsyncIterator[ProgressEvent | None]:
+    async def subscribe(
+        self, investigation_id: str, after_seq: int = 0, *, is_active: bool = True, heartbeat: float = 15.0
+    ) -> AsyncIterator[ProgressEvent | None]:
         """Replay stored events, then stream live ones. Yields ``None`` as heartbeat."""
         queue: asyncio.Queue[ProgressEvent] = asyncio.Queue(maxsize=1000)
         self._subscribers[investigation_id].add(queue)

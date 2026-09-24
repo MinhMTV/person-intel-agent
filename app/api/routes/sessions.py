@@ -40,7 +40,9 @@ async def list_sessions(c: Container = Depends(require_session_management)) -> d
 
 
 @router.post("/{platform}/cookies")
-async def import_cookies(platform: str, body: dict = Body(...), c: Container = Depends(require_session_management)) -> dict[str, Any]:
+async def import_cookies(
+    platform: str, body: dict = Body(...), c: Container = Depends(require_session_management)
+) -> dict[str, Any]:
     cookies = body.get("cookies")
     if not isinstance(cookies, list) or len(cookies) > 500:
         raise HTTPException(status_code=400, detail="Expected a JSON array of cookies")
@@ -52,7 +54,9 @@ async def import_cookies(platform: str, body: dict = Body(...), c: Container = D
 
 
 @router.post("/{platform}/login")
-async def browser_login(platform: str, request: Request, c: Container = Depends(require_session_management)) -> dict[str, Any]:
+async def browser_login(
+    platform: str, request: Request, c: Container = Depends(require_session_management)
+) -> dict[str, Any]:
     if not is_loopback(request):
         raise HTTPException(status_code=403, detail="Interactive login opens a browser on the server; localhost only")
     result = await interactive_login(c.sessions, _platform(platform))

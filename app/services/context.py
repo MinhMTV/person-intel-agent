@@ -42,8 +42,13 @@ class RunContext:
         self.emit(
             EventType.PROVIDER_FINISHED,
             f"{run.provider}: {run.outcome.value.lower().replace('_', ' ')}",
-            provider=run.provider, stage=run.stage, outcome=run.outcome.value, result_count=run.result_count,
-            duration_ms=run.duration_ms, cache_hit=run.cache_hit, error=run.error,
+            provider=run.provider,
+            stage=run.stage,
+            outcome=run.outcome.value,
+            result_count=run.result_count,
+            duration_ms=run.duration_ms,
+            cache_hit=run.cache_hit,
+            error=run.error,
         )
 
     def cache(self, hit: bool) -> None:

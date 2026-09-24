@@ -51,13 +51,18 @@ EMBEDDINGS = {
 }
 
 
-def make_image(faces: list[tuple[tuple[int, int, int], tuple[int, int, int]]] | None = None, *, seed: int = 0,
-               size: tuple[int, int] = (320, 320), fmt: str = "PNG") -> bytes:
+def make_image(
+    faces: list[tuple[tuple[int, int, int], tuple[int, int, int]]] | None = None,
+    *,
+    seed: int = 0,
+    size: tuple[int, int] = (320, 320),
+    fmt: str = "PNG",
+) -> bytes:
     """Noise background + solid squares. faces = [(colour, (x, y, side)), ...]."""
     rng = np.random.default_rng(seed)
     arr = rng.integers(60, 190, size=(size[1], size[0], 3), dtype=np.uint8)
     for colour, (x, y, side) in faces or []:
-        arr[y:y + side, x:x + side] = colour
+        arr[y : y + side, x : x + side] = colour
     buf = io.BytesIO()
     Image.fromarray(arr).save(buf, format=fmt, **({"quality": 95} if fmt == "JPEG" else {}))
     return buf.getvalue()
@@ -85,10 +90,16 @@ class FakeFaceBackend:
             if mask.sum() < 64:
                 continue
             ys, xs = np.nonzero(mask)
-            faces.append(FaceObservation(
-                x=int(xs.min()), y=int(ys.min()), w=int(xs.max() - xs.min() + 1), h=int(ys.max() - ys.min() + 1),
-                confidence=0.99, embedding=embedding.astype(np.float32),
-            ))
+            faces.append(
+                FaceObservation(
+                    x=int(xs.min()),
+                    y=int(ys.min()),
+                    w=int(xs.max() - xs.min() + 1),
+                    h=int(ys.max() - ys.min() + 1),
+                    confidence=0.99,
+                    embedding=embedding.astype(np.float32),
+                )
+            )
         return faces
 
 
@@ -128,8 +139,9 @@ async def public_resolver(host: str, port: int) -> list[str]:
 class FakeReverseProvider(ReverseImageProvider):
     name = "fake_reverse"
 
-    def __init__(self, results: list[ImageDiscoveryResult] | None = None, error: Exception | None = None,
-                 configured: bool = True):
+    def __init__(
+        self, results: list[ImageDiscoveryResult] | None = None, error: Exception | None = None, configured: bool = True
+    ):
         self.results = results or []
         self.error = error
         self.configured = configured
@@ -148,8 +160,9 @@ class FakeReverseProvider(ReverseImageProvider):
 class FakeSearchProvider(WebSearchProvider):
     name = "fake_search"
 
-    def __init__(self, hits_by_substring: dict[str, list[tuple[str, str, str]]] | None = None,
-                 error: Exception | None = None):
+    def __init__(
+        self, hits_by_substring: dict[str, list[tuple[str, str, str]]] | None = None, error: Exception | None = None
+    ):
         self.hits = hits_by_substring or {}
         self.error = error
         self.queries: list[str] = []

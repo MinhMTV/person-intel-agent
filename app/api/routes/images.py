@@ -33,13 +33,16 @@ async def reference_image_file(investigation_id: str, image_id: str, c: Containe
     ref = next((r for r in inv.reference_images if r.id == image_id), None)
     data = c.reference_images.read_bytes(ref) if ref else None
     if data is None:
-        raise HTTPException(status_code=404, detail="Image not available (it may have expired under the retention policy)")
+        raise HTTPException(
+            status_code=404, detail="Image not available (it may have expired under the retention policy)"
+        )
     return Response(content=data, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=300"})
 
 
 @router.put("/{image_id}/face")
-async def select_target_face(investigation_id: str, image_id: str, body: dict = Body(...),
-                             c: Container = Depends(get_container)) -> dict[str, Any]:
+async def select_target_face(
+    investigation_id: str, image_id: str, body: dict = Body(...), c: Container = Depends(get_container)
+) -> dict[str, Any]:
     inv = load_investigation(c, investigation_id, with_result=False)
     ensure_not_running(c, inv)
     try:
@@ -50,7 +53,9 @@ async def select_target_face(investigation_id: str, image_id: str, body: dict = 
 
 
 @router.delete("/{image_id}")
-async def delete_reference_image(investigation_id: str, image_id: str, c: Container = Depends(get_container)) -> dict[str, bool]:
+async def delete_reference_image(
+    investigation_id: str, image_id: str, c: Container = Depends(get_container)
+) -> dict[str, bool]:
     inv = load_investigation(c, investigation_id, with_result=False)
     ensure_not_running(c, inv)
     if not c.reference_images.delete(inv.id, image_id):

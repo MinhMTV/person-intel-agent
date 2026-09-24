@@ -76,7 +76,9 @@ def test_phash_robust_to_resize_and_different_for_other_images():
 async def test_reference_pipeline_quality_and_faces(make_container):
     c = make_container()
     inv = c.investigations.create()
-    ref = await c.investigations.add_reference_image(inv.id, "../../etc/passwd.png", make_image([(JANE, (100, 80, 110))], seed=1))
+    ref = await c.investigations.add_reference_image(
+        inv.id, "../../etc/passwd.png", make_image([(JANE, (100, 80, 110))], seed=1)
+    )
     assert ref.filename == "passwd.png"  # display name sanitised, never used as a path
     assert ref.selected_face_id == "f1" and ref.faces[0].thumbnail.startswith("data:image/jpeg")
     assert ref.quality.label in (QualityLabel.GOOD, QualityLabel.USABLE, QualityLabel.POOR)
